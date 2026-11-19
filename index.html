@@ -30,6 +30,7 @@ nav button.on{color:var(--accent)}
 .board{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .fr{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-align:center}
 .fr.cur{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.fr.ed{border-color:var(--warn);box-shadow:0 0 0 2px var(--warn)}
 .fr .n{font-size:11px;color:var(--mute);padding:2px 0}
 .fr .rolls{display:flex;justify-content:flex-end;border-bottom:1px solid var(--line)}
 .fr .rolls span{flex:1;min-width:0;height:24px;line-height:24px;font-weight:700;font-size:14px;border-left:1px solid var(--line)}
@@ -189,7 +190,7 @@ function loadLocal(){try{const s=localStorage.getItem(LS);if(s){const o=JSON.par
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){}}
 let dbDoc=null,saveTimer=null;
 function persist(){
-  state.u=Date.now();saveLocal();
+  state.u=Date.now();saveLocal();try{ghSchedule();}catch(e){}
   clearTimeout(saveTimer);
   saveTimer=setTimeout(async()=>{
     if(!dbDoc)return;
@@ -293,6 +294,7 @@ function analyze(games){
   return A;
 }
 const CTXL={c:'Centre',b:'Boule',o:'Piste',q:'Quilles'};
+function wLbl(w){w=+w;return w?w+' lb ('+(w*0.45359237).toFixed(1).replace('.',',')+' kg)':'';}
 function ctxOf(){return state.settings.ctx||(state.settings.ctx={});}
 function ctxKnown(k){const m={};(state.games||[]).forEach(g=>{if(g.ctx&&g.ctx[k])m[g.ctx[k]]=1;if(k==='b')(g.bs||[]).forEach(x=>{if(x.b)m[x.b]=1;});});return Object.keys(m);}
 function ballAt(g,k){let b=(g.ctx&&g.ctx.b)||'';(g.bs||[]).forEach(x=>{if(x.i<=k)b=x.b;});return b;}
@@ -334,12 +336,13 @@ function ctxCardStats(games){
   return rows?'<div class="card"><h2>Selon le contexte</h2>'+rows+'<div class="small mute" style="margin-top:8px">Moyenne par centre, boule et état de piste (2 parties minimum). À lire avec prudence : peu de parties, beaucoup de facteurs.</div></div>':'';
 }
 function ctxCard(){
-  const x=ctxOf(),open=ui.ctxOpen,sum=[x.c,x.b,x.o,x.q].filter(Boolean).join(' · ');
+  const x=ctxOf(),open=ui.ctxOpen,sum=[x.c,x.b,wLbl(x.w),x.o,x.q].filter(Boolean).join(' · ');
   let h='<div class="card" style="padding:10px 14px"><div class="lab" data-act="ctx-toggle" style="cursor:pointer;margin:0"><span class="small">'+(sum?esc(sum):'Contexte de la session (centre, boule, piste)')+'</span><span class="mute small">'+(open?'fermer':'modifier')+'</span></div>';
   if(open){
     h+='<div style="height:8px"></div><input class="txt" id="ctxc" placeholder="Centre de bowling (tape une ville ou un nom)" maxlength="60" autocomplete="off" value="'+esc(x.c||'')+'"><div id="sugc"></div>'
       +'<div style="height:8px"></div><input class="txt" id="ctxb" placeholder="Boule utilisée (ex. Storm, Hammer…)" maxlength="60" autocomplete="off" value="'+esc(x.b||'')+'"><div id="sugb"></div>'
       +'<div style="margin-top:8px"><label class="btn block" for="ballfile" style="display:flex;align-items:center;justify-content:center;cursor:pointer">📷 Photographier ma boule</label><input id="ballfile" type="file" accept="image/*" style="display:none"><div id="ballres">'+ballResHTML()+'</div></div>'
+      +'<div class="small mute" style="margin:10px 0 4px">Poids de la boule</div><select id="ctxw" style="width:100%"><option value="">Non précisé</option>'+[8,9,10,11,12,13,14,15,16].map(w=>'<option value="'+w+'"'+(+x.w===w?' selected':'')+'>'+wLbl(w)+'</option>').join('')+'</select>'
       +'<div class="small mute" style="margin:10px 0 4px">État de la piste</div><div class="seg" style="display:flex;width:100%">'+['Sec','Normal','Huilé'].map(o=>'<button style="flex:1;padding:9px 2px" data-act="oil" data-o="'+o+'" class="'+(x.o===o?'on':'')+'">'+o+'</button>').join('')+'</div>'
       +'<div class="small mute" style="margin:10px 0 4px">Quilles</div><div class="seg" style="display:flex;width:100%">'+[['Libres','Libres'],['À ficelle','À ficelle']].map(o=>'<button style="flex:1;padding:9px 2px" data-act="qtype" data-o="'+o[0]+'" class="'+(x.q===o[0]?'on':'')+'">'+o[1]+'</button>').join('')+'</div>'
       +'<div class="small mute" style="margin-top:8px">Tu ne sais pas pour la piste ou les quilles ? Laisse vide : tes stats n’en tiennent pas compte. S’applique aux prochaines parties enregistrées.</div>';
@@ -576,8 +579,8 @@ function throwScore(m,ref){
   if(isNum(m.en)){
     const g=m.en-17.5,a=Math.abs(g);
     add('en','Précision d’entrée',30,100-a*25,
-      a<=0.7?'Tu entres bien dans la poche.':'Entrée à '+nf(a)+' planche'+(a>=1.5?'s':'')+' de la poche, '+(g>0?'trop près du centre.':'trop vers l’extérieur.'),
-      g>0?'Décale ta cible d’une planche vers ta rigole, puis refais le même geste.':'Décale ta cible d’une planche vers le centre de la piste, puis refais le même geste.');
+      a<=0.7?'Tu entres bien dans la poche.':'Entrée à '+nf(a)+' latte'+(a>=1.5?'s':'')+' de la poche, '+(g>0?'trop près du centre.':'trop vers l’extérieur.'),
+      g>0?'Décale ta cible d’une latte vers ta rigole, puis refais le même geste.':'Décale ta cible d’une latte vers le centre de la piste, puis refais le même geste.');
   }
   if(isNum(m.an)){
     const a=m.an,d=a<4?4-a:a>6?a-6:0;
@@ -588,13 +591,13 @@ function throwScore(m,ref){
   if(isNum(m.vf)){
     const v=m.vf,d=v<15?15-v:v>18?v-18:0;
     add('vf','Vitesse',15,100-d*12,
-      d===0?nf(v)+' mph : vitesse bien placée.':nf(v)+' mph : '+(v<15?'un peu lent.':'un peu rapide.'),
+      d===0?spd(v)+' : vitesse bien placée.':spd(v)+' : '+(v<15?'un peu lent.':'un peu rapide.'),
       v<15?'Cherche un pas plus dynamique et un élan plus fluide.':'Relâche l’épaule et laisse la boule descendre sans forcer.');
   }
   if(isNum(m.vf)&&isNum(m.vl)){
     const L=m.vf-m.vl,d=L<1.5?1.5-L:L>3.5?L-3.5:0;
     add('pv','Perte de vitesse',10,100-d*20,
-      d===0?'Perte de '+nf(L)+' mph : normale.':'Perte de '+nf(L)+' mph : '+(L>3.5?'élevée.':'faible, vérifie le calage.'),
+      d===0?'Perte de '+spd(L)+' : normale.':'Perte de '+spd(L)+' : '+(L>3.5?'élevée.':'faible, vérifie le calage.'),
       L>3.5?'Lâche la boule un peu plus tôt et reste fluide dans l’élan.':'Contrôle le calage de la piste (points jaunes) pour fiabiliser la mesure.');
   }
   const r=(ref||[]).slice(-10),ra=r.filter(x=>isNum(x.ar)),rv=r.filter(x=>isNum(x.vf));
@@ -602,7 +605,7 @@ function throwScore(m,ref){
     const da=Math.abs(m.ar-mean(ra.map(x=>x.ar))),dv=isNum(m.vf)&&rv.length>=3?Math.abs(m.vf-mean(rv.map(x=>x.vf))):null;
     const sc=dv===null?100-da*35:(100-da*35+100-dv*45)/2;
     add('rg','Régularité',25,sc,
-      'Flèche à '+nf(da)+' planche'+(da>=1.5?'s':'')+' de ta moyenne'+(dv!==null?', vitesse à '+nf(dv)+' mph.':'.'),
+      'Flèche à '+nf(da)+' latte'+(da>=1.5?'s':'')+' de ta moyenne'+(dv!==null?', vitesse à '+nf(dv)+' mph.':'.'),
       'Refais le même lancer avec la même routine (départ, cible, vitesse) pour resserrer tes flèches.');
   }
   if(!parts.length)return null;
@@ -646,25 +649,27 @@ function laneSVG(S){
   return s+'</svg>';
 }
 function sv(label,val,sub){return'<div class="sv"><small>'+label+'</small><b>'+val+'</b>'+(sub?'<small>'+sub+'</small>':'')+'</div>';}
-function speedTxt(v){return v===null?'—':nf(v)+' mph <span class="mute small">· '+nf(v*1.609344,0)+' km/h</span>';}
+const KMH=v=>v*1.609344;
+function spd(v){return nf(KMH(v),0)+' km/h ('+nf(v)+' mph)';}
+function speedTxt(v){return v===null?'—':nf(KMH(v),0)+' km/h <span class="mute small">('+nf(v)+' mph)</span>';}
 function panel(S){
   let h='';
   h+=sv('Vitesse au départ',speedTxt(S.vFirst));
   if(S.n>2)h+=sv('Vitesse à l’arrivée',speedTxt(S.vLast),S.vFirst!==null&&S.vLast!==null?'perte : '+nf(S.vFirst-S.vLast)+' mph':'');
-  h+=sv('Planche au départ',nf(S.start.b,0),'à '+nf(S.start.d,0)+' ft');
-  h+=sv('Planche aux flèches',S.arrow===null?'—':nf(S.arrow,0),'≈ 15 ft');
-  h+=sv('Point de cassure',S.brk?'planche '+nf(S.brk.b,0):'—',S.brk?'à '+nf(S.brk.d,0)+' ft':'marque ≥ 3 positions');
+  h+=sv('Latte au départ',nf(S.start.b,0),'à '+nf(S.start.d,0)+' ft');
+  h+=sv('Latte aux flèches',S.arrow===null?'—':nf(S.arrow,0),'≈ 15 ft');
+  h+=sv('Point de cassure',S.brk?'latte '+nf(S.brk.b,0):'—',S.brk?'à '+nf(S.brk.d,0)+' ft':'marque ≥ 3 positions');
   const gap=S.entry!==null?S.entry-17.5:null;
-  h+=sv('Planche d’entrée'+(S.entryEst?' (estimée)':''),S.entry===null?'—':nf(S.entry,1),gap===null?'':'poche ≈ 17,5 · écart '+(gap>0?'+':'')+nf(gap,1));
+  h+=sv('Latte d’entrée'+(S.entryEst?' (estimée)':''),S.entry===null?'—':nf(S.entry,1),gap===null?'':'poche ≈ 17,5 · écart '+(gap>0?'+':'')+nf(gap,1));
   h+=sv('Angle d’entrée',S.angle===null?'—':nf(S.angle,1)+' °','repère : 4 à 6 °');
-  h+=sv('Crochet',S.hook===null?'—':nf(S.hook,0)+' planches','cassure → entrée');
+  h+=sv('Crochet',S.hook===null?'—':nf(S.hook,0)+' lattes','cassure → entrée');
   h+=sv('Rotation',S.rpm===null?'—':nf(S.rpm,0)+' tr/min','');
   return h;
 }
 function throwSummary(){
   const T=throwsSrc();if(!T.length)return null;
   const avg=k=>{const v=T.map(x=>x[k]).filter(x=>x!==null&&x!==undefined);return v.length?+mean(v).toFixed(1):null;};
-  return{lancers_enregistres:T.length,vitesse_depart_moy_mph:avg('vf'),planche_entree_moy:avg('en'),angle_entree_moy_deg:avg('an'),rotation_moy_rpm:avg('rpm')};
+  return{lancers_enregistres:T.length,vitesse_depart_moy_mph:avg('vf'),latte_entree_moy:avg('en'),angle_entree_moy_deg:avg('an'),rotation_moy_rpm:avg('rpm')};
 }
 function viewThrow(){return'<button class="link" data-act="go" data-tab="home" style="padding-left:2px">‹ Accueil</button>'+demoBar()+viewThrow0()+demoLink();}
 function box(cls,title,body){return'<div class="ins'+(cls?' '+cls:'')+'" style="margin:12px 0 8px"><strong>'+title+'</strong><span class="small">'+body+'</span></div>';}
@@ -672,7 +677,7 @@ function viewThrow0(){
   const t=ui.t,hasSrc=t.url||t.sample,hand=state.settings.hand;
   let h='';
   if(!hasSrc){
-    h+='<div class="card"><h2>Analyse vidéo d’un lancer</h2><p class="small mute">Importe une vidéo de ton lancer : l’application calibre la piste et suit la boule toute seule, puis affiche vitesse, planche aux flèches, cassure et angle d’entrée.</p>'
+    h+='<div class="card"><h2>Analyse vidéo d’un lancer</h2><p class="small mute">Importe une vidéo de ton lancer : l’application calibre la piste et suit la boule toute seule, puis affiche vitesse, latte aux flèches, cassure et angle d’entrée.</p>'
       +'<label class="btn primary block fileb" for="vfile">Importer une vidéo</label><input id="vfile" type="file" accept="video/*" style="display:none">'
       +'<div style="height:8px"></div><button class="btn block" data-act="tsample">Voir un exemple</button></div>'
       +'<div class="card"><h2>Pour de bons résultats</h2><div class="small">• Téléphone <b>fixe</b> (trépied), derrière toi, toute la piste visible jusqu’aux quilles.<br>• Bon éclairage, 60 images/s si possible.<br>• Ce sont des estimations : tu peux corriger le calage en déplaçant les points jaunes.</div></div>';
@@ -713,8 +718,8 @@ function throwHistory(){
   const m=throwSummary(),SC=T.map((x,i)=>{const r=throwScore(x,T.slice(0,i));return r?r.total:null;}),ok=SC.filter(v=>v!==null);
   let ser=0;for(let i=SC.length-1;i>=0&&SC[i]!==null&&SC[i]>=70;i--)ser++;
   const sumLine=ok.length?'<div class="small" style="margin-bottom:6px"><b>Score</b> · meilleur '+Math.max(...ok)+' · moyenne des 5 derniers '+Math.round(mean(ok.slice(-5)))+(ser>=2?' · 🔥 série de '+ser+' lancers à 70+':'')+'</div>':'';
-  return'<div class="card"><h2>Lancers enregistrés</h2>'+sumLine+'<div class="small mute" style="margin-bottom:6px">Vitesse moyenne au départ : '+nf(m.vitesse_depart_moy_mph)+' mph · planche d’entrée moyenne : '+nf(m.planche_entree_moy)+'</div>'
-    +T.map((x,i)=>({x,i})).reverse().map(({x,i})=>'<div class="hist"><div><b>'+nf(x.vf)+' mph</b> <span class="mute small">· entrée '+nf(x.en)+' · '+nf(x.an)+'°</span><div class="mute small">'+new Date(x.d).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</div></div>'+(SC[i]!==null?'<span class="scbadge '+scClass(SC[i])+'">'+SC[i]+'</span> ':'')+(ui.demo?'':'<button class="link" data-act="tdel" data-id="'+esc(x.id)+'">'+(ui.delT===x.id?'Confirmer':'Supprimer')+'</button>')+'</div>').join('')+'</div>';
+  return'<div class="card"><h2>Lancers enregistrés</h2>'+sumLine+'<div class="small mute" style="margin-bottom:6px">Vitesse moyenne au départ : '+(isNum(m.vitesse_depart_moy_mph)?spd(m.vitesse_depart_moy_mph):'—')+' · latte d’entrée moyenne : '+nf(m.latte_entree_moy)+'</div>'
+    +T.map((x,i)=>({x,i})).reverse().map(({x,i})=>'<div class="hist"><div><b>'+(isNum(x.vf)?nf(KMH(x.vf),0)+' km/h':'—')+'</b> <span class="mute small">('+nf(x.vf)+' mph)</span> <span class="mute small">· entrée '+nf(x.en)+' · '+nf(x.an)+'°</span><div class="mute small">'+new Date(x.d).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</div></div>'+(SC[i]!==null?'<span class="scbadge '+scClass(SC[i])+'">'+SC[i]+'</span> ':'')+(ui.demo?'':'<button class="link" data-act="tdel" data-id="'+esc(x.id)+'">'+(ui.delT===x.id?'Confirmer':'Supprimer')+'</button>')+'</div>').join('')+'</div>';
 }
 function updateAIT(){const el=$('#aithrow');if(el)el.innerHTML=ui.aiThrow?md(ui.aiThrow):(ui.busy?'<p class="mute">Le coach réfléchit…</p>':'');const b=$('#tai');if(b)b.disabled=ui.busy;}
 async function askThrow(){
@@ -722,7 +727,7 @@ async function askThrow(){
   const s=await getSample();
   if(!s){ui.aiThrow='Le coach IA n’est pas disponible ici.';updateAIT();return;}
   const r=v=>v===null||v===undefined?null:+(+v).toFixed(1);
-  const data={main:state.settings.hand==='G'?'gaucher':'droitier',nb_marques:S.n,vitesse_depart_mph:r(S.vFirst),vitesse_arrivee_mph:S.n>2?r(S.vLast):null,planche_depart:r(S.start.b),planche_fleches:r(S.arrow),point_cassure:S.brk?{planche:r(S.brk.b),distance_ft:r(S.brk.d)}:null,planche_entree:r(S.entry),entree_estimee:S.entryEst,poche_ideale:17.5,angle_entree_deg:r(S.angle),rotation_tr_min:r(S.rpm)};
+  const data={main:state.settings.hand==='G'?'gaucher':'droitier',nb_marques:S.n,vitesse_depart_mph:r(S.vFirst),vitesse_arrivee_mph:S.n>2?r(S.vLast):null,latte_depart:r(S.start.b),latte_fleches:r(S.arrow),point_cassure:S.brk?{latte:r(S.brk.b),distance_ft:r(S.brk.d)}:null,latte_entree:r(S.entry),entree_estimee:S.entryEst,poche_ideale:17.5,angle_entree_deg:r(S.angle),rotation_tr_min:r(S.rpm)};
   ui.busy=true;ui.aiThrow='';updateAIT();
   try{
     const res=await s(COACH_RULES+'\n\nMesures d’un lancer faites à la main sur vidéo (marge d’erreur à rappeler) :\n'+JSON.stringify(data)+'\n\nJoueur : moyenne 175. Commente ce lancer : points forts, puis 2 corrections prioritaires avec un exercice simple pour chacune. 250 mots maximum.',{cache:false,onText:({text})=>{ui.aiThrow=text;updateAIT();}});
@@ -1011,7 +1016,7 @@ function pmCard(){
       +(state.profiles.length>1&&p.id!==state.active?'<button class="btn" data-act="pdel" data-id="'+esc(p.id)+'" style="height:44px;font-size:14px">'+(ui.delP===p.id?'Confirmer':'Supprimer')+'</button>':'<span class="small mute" style="flex:1;text-align:center">'+(p.id===state.active?'actif':'')+'</span>')+'</div>').join('')
     +(state.profiles.length<4?'<button class="btn block" data-act="padd">+ Ajouter un joueur</button>':'')
     +'<div class="small mute" style="margin-top:8px">Chaque joueur a ses propres parties, lancers et réglages (main). Touche un nom en haut de l’écran pour changer de joueur.</div>'
-    +'<div style="text-align:center"><button class="link" data-act="pclose">Fermer</button></div></div>'+bkCard();
+    +'<div style="text-align:center"><button class="link" data-act="pclose">Fermer</button></div></div>'+ghCard()+bkCard();
 }
 function bkExport(){return JSON.stringify({app:'coach-bowling',v:1,at:new Date().toISOString(),state:state});}
 function bkCard(){
@@ -1050,6 +1055,108 @@ function bkRestore(){
   Object.assign(ui,{bkConf:false,bkErr:'',bkOut:'',bkPending:'',pend:null,sel:[],gv:null,demo:false,pm:false,aiText:''});
   persist();render();toast('Données restaurées ✓');
 }
+/* ---------- synchronisation GitHub (dépôt privé) ---------- */
+const GHK='bowling-coach-gh',GHFILE='donnees-bowling.json';
+const GH={busy:false,again:false,timer:null,st:'',at:0,err:''};
+function ghCfg(){try{const o=JSON.parse(localStorage.getItem(GHK)||'null');return o&&o.repo&&o.tok?o:null;}catch(e){return null;}}
+function ghSet(o){try{if(o)localStorage.setItem(GHK,JSON.stringify(o));else localStorage.removeItem(GHK);}catch(e){}}
+function ghTomb(id){if(!Array.isArray(state.del))state.del=[];if(!state.del.includes(id))state.del.push(id);}
+function b64e(t){const b=new TextEncoder().encode(t);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s);}
+function b64d(t){const s=atob(String(t).replace(/\s/g,'')),b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return new TextDecoder().decode(b);}
+function ghLocal(){
+  return{profiles:state.profiles.map(p=>({id:p.id,name:p.name,games:p.id===state.active?state.games:((p.data&&p.data.games)||[])})),del:Array.isArray(state.del)?state.del:[]};
+}
+function ghMerge(A,B){
+  const del=Array.from(new Set([].concat(A.del||[],B.del||[]))),dels=new Set(del),ts=g=>g.e||g.d||'';
+  const out=[],idx={};
+  [B,A].forEach(src=>(src.profiles||[]).forEach(p=>{
+    let q=idx[p.id];if(!q){q=idx[p.id]={id:p.id,name:p.name,g:{}};out.push(q);}else if(src===A&&p.name)q.name=p.name;
+    (p.games||[]).forEach(g=>{if(!g||!g.id||dels.has(g.id))return;const o=q.g[g.id];if(!o||ts(g)>=ts(o))q.g[g.id]=g;});
+  }));
+  return{profiles:out.map(q=>({id:q.id,name:q.name,games:Object.values(q.g).sort((a,b)=>String(a.d).localeCompare(String(b.d)))})),del};
+}
+function ghSig(D){return JSON.stringify(D.profiles.map(p=>[p.id,p.name,p.games]))+'|'+D.del.length;}
+function ghApply(M){
+  const before=ghSig(ghLocal());
+  M.profiles.forEach(mp=>{
+    let p=state.profiles.find(x=>x.id===mp.id);
+    if(!p){p={id:mp.id,name:mp.name,data:null};state.profiles.push(p);}
+    if(p.id===state.active)state.games=mp.games;
+    else{p.data=p.data||{games:[],current:{r:[],l:{}},settings:{hand:'D'},throws:[]};p.data.games=mp.games;}
+  });
+  state.del=M.del;
+  const changed=ghSig(ghLocal())!==before;
+  if(changed){saveLocal();const a=document.activeElement;if(!a||!/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))render();else renderWho();}
+  return changed;
+}
+async function ghReq(cfg,method,body){
+  const u='https://api.github.com/repos/'+cfg.repo+'/contents/'+GHFILE;
+  return fetch(u+(method==='GET'?'?t='+Date.now():''),{method,cache:'no-store',headers:{'Authorization':'Bearer '+cfg.tok,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},body:body?JSON.stringify(body):undefined});
+}
+function ghErr(r){
+  if(r===0)return'Pas de connexion internet : la synchro reprendra plus tard.';
+  if(r===401)return'Clé d’accès refusée ou expirée : crée une nouvelle clé sur GitHub.';
+  if(r===403)return'La clé n’a pas le droit d’écrire : coche « Contents : Read and write ».';
+  if(r===404)return'Dépôt introuvable : vérifie son nom et que la clé y a accès.';
+  return'Erreur GitHub ('+r+').';
+}
+async function ghSync(manual){
+  const cfg=ghCfg();if(!cfg||ui.demo)return;
+  if(GH.busy){GH.again=true;return;}
+  GH.busy=true;GH.st='busy';ghPaint();
+  try{
+    for(let tryN=0;tryN<3;tryN++){
+      let r;try{r=await ghReq(cfg,'GET');}catch(e){throw{code:0};}
+      let remote={profiles:[],del:[]},sha=null;
+      if(r.status===200){const j=await r.json();sha=j.sha;try{const o=JSON.parse(b64d(j.content||''));if(o&&Array.isArray(o.profiles))remote=o;}catch(e){}}
+      else if(r.status!==404)throw{code:r.status};
+      else{let t;try{t=await fetch('https://api.github.com/repos/'+cfg.repo,{cache:'no-store',headers:{'Authorization':'Bearer '+cfg.tok,'Accept':'application/vnd.github+json'}});}catch(e){throw{code:0};}if(!t.ok)throw{code:t.status};}
+      const M=ghMerge(ghLocal(),remote);
+      ghApply(M);
+      if(ghSig(M)===ghSig({profiles:remote.profiles||[],del:remote.del||[]})&&sha)break;
+      const payload=JSON.stringify({app:'coach-bowling',v:1,u:new Date().toISOString(),profiles:M.profiles,del:M.del});
+      let w;try{w=await ghReq(cfg,'PUT',{message:'Synchro Coach Bowling',content:b64e(payload),sha:sha||undefined});}catch(e){throw{code:0};}
+      if(w.ok)break;
+      if(w.status===409||w.status===422)continue;
+      throw{code:w.status};
+    }
+    GH.st='ok';GH.at=Date.now();GH.err='';
+    if(manual)toast('Synchronisé ✓');
+  }catch(e){GH.st='err';GH.err=ghErr(e&&e.code!==undefined?e.code:-1);if(manual)toast(GH.err);}
+  finally{GH.busy=false;ghPaint();if(GH.again){GH.again=false;ghSchedule();}}
+}
+function ghSchedule(){if(!ghCfg())return;clearTimeout(GH.timer);GH.timer=setTimeout(()=>ghSync(false),2500);}
+function ghPaint(){
+  const s=$('#sync');if(s&&ghCfg())s.textContent=GH.st==='busy'?'Synchro…':GH.st==='ok'?'Synchronisé ✓':GH.st==='err'?'Synchro en attente':'';
+  const c=$('#ghstat');if(c)c.innerHTML=ghStat();
+}
+function ghStat(){
+  if(GH.st==='busy')return'<span class="small mute">Synchronisation en cours…</span>';
+  if(GH.st==='err')return'<div class="ins warn" style="margin:6px 0"><span class="small">'+esc(GH.err)+'</span></div>';
+  if(GH.st==='ok')return'<span class="small" style="color:var(--good)">✓ Synchronisé à '+new Date(GH.at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+'</span>';
+  return'';
+}
+function ghCard(){
+  const c=ghCfg();
+  let h='<div class="card"><h2>Synchronisation GitHub</h2>';
+  if(c){
+    h+='<div class="small mute" style="margin-bottom:6px">Les parties de tous les joueurs sont enregistrées dans le dépôt privé <b>'+esc(c.repo)+'</b> et partagées entre les téléphones connectés.</div><div id="ghstat">'+ghStat()+'</div>'
+      +'<div class="row2" style="margin-top:8px"><button class="btn primary" data-act="gh-now">Synchroniser</button><button class="btn" data-act="gh-off">'+(ui.ghOff?'Confirmer':'Déconnecter')+'</button></div>';
+  }else{
+    h+='<div class="small mute" style="margin-bottom:8px">Enregistre les parties dans un dépôt GitHub privé : rien n’est perdu si tu changes de téléphone, et les parties de chaque joueur se retrouvent sur tous les téléphones connectés.</div>'
+      +'<input class="txt" id="ghrepo" placeholder="pseudo/depot (ex. kioukoi/bowling-data)" value="kioukoi/bowling-data" autocomplete="off" autocapitalize="off" spellcheck="false">'
+      +'<input class="txt" id="ghtok" type="password" placeholder="Clé d’accès GitHub (github_pat_…)" autocomplete="off" autocapitalize="off" spellcheck="false">'
+      +'<button class="btn primary block" data-act="gh-save">Connecter</button>'
+      +'<div class="small mute" style="margin-top:8px">La clé reste uniquement sur ce téléphone. Elle n’est jamais incluse dans les sauvegardes copiées.</div>';
+  }
+  return h+'</div>';
+}
+function ghInit(){
+  ghSync(false);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ghSync(false);});
+  window.addEventListener('online',()=>ghSync(false));
+}
+
 function duelCard(){
   const D=demoData(),ps=(ui.demo?[{n:demoName('m'),g:D.m.games},{n:demoName('d'),g:D.d.games}]:state.profiles.map(p=>({n:p.name,g:p.id===state.active?state.games:((p.data&&p.data.games)||[])}))).filter(x=>x.g.length);
   if(ps.length<2)return'';
@@ -1058,8 +1165,8 @@ function duelCard(){
   return'<div class="card"><h2>Duel</h2><table class="duel"><tr><td></td>'+rows.map(r=>'<td><b>'+esc(r.n)+'</b></td>').join('')+'</tr>'
     +line('Moyenne',r=>r.avg)+line('Meilleur',r=>r.best)+line('Parties',r=>r.np)+line('Strikes',r=>showPct(r.st))+line('Spares',r=>showPct(r.sp))+'</table></div>';
 }
-function boardHTML(r,curF,L){
-  const sc=score(r),fi=frameIdx(r),sb=standingBefore(r);L=L||{};
+function boardHTML(r,curF,L,ek){
+  const sc=score(r),fi=frameIdx(r),sb=standingBefore(r),nsb=nextState(r);L=L||{};
   const sy=k=>{const t=sym(r[k],sb[k]);return(sb[k]===10&&r[k]<10&&L[k]&&isSplit(L[k]))?'<i class="spl">'+t+'</i>':t;};
   let h='<div class="board">';
   for(let f=0;f<10;f++){
@@ -1072,7 +1179,8 @@ function boardHTML(r,curF,L){
     }else{
       for(let j=0;j<3;j++)boxes+='<span>'+(ids[j]!==undefined?sy(ids[j]):'')+'</span>';
     }
-    h+='<div class="fr'+(f===curF?' cur':'')+'"><div class="n">'+(f+1)+'</div><div class="rolls">'+boxes+'</div><div class="cum">'+(sc.cum[f]===null?'':sc.cum[f])+'</div></div>';
+    const edOk=ek&&ids.length&&(nsb.done||f<nsb.frame),edOn=ek&&ui.fe&&ui.fe.k===ek&&ui.fe.f===f;
+    h+='<div class="fr'+(f===curF?' cur':'')+(edOn?' ed':'')+'"'+(edOk?' data-act="fedit" data-k="'+esc(ek)+'" data-f="'+f+'" style="cursor:pointer"':'')+'><div class="n">'+(f+1)+'</div><div class="rolls">'+boxes+'</div><div class="cum">'+(sc.cum[f]===null?'':sc.cum[f])+'</div></div>';
   }
   return h+'</div>';
 }
@@ -1083,7 +1191,9 @@ function gameDetail(g){
   const dt=new Date(g.d);
   const when=dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   let h='<div class="row2" style="margin:6px 0"><button class="btn" data-act="gback">← Stats</button><button class="btn" data-act="gnav" data-n="-1"'+(idx>0?'':' disabled')+'>◀</button><button class="btn" data-act="gnav" data-n="1"'+(idx>=0&&idx<arr.length-1?'':' disabled')+'>▶</button></div>';
-  h+='<div class="card"><h2>Partie du '+esc(when)+'</h2>'+((g.m&&g.m!=='E')||g.ctx||(g.bs&&g.bs.length)?'<div class="small mute" style="margin:-4px 0 8px">'+[(g.m&&g.m!=='E')?MODES[g.m]+(g.ev?' · '+esc(g.ev):''):'',g.ctx?[g.ctx.c,(g.bs&&g.bs.length)?gameBalls(g).join(' → '):g.ctx.b,g.ctx.o,g.ctx.q].filter(Boolean).map(esc).join(' · '):(g.bs&&g.bs.length?gameBalls(g).map(esc).join(' → '):'')].filter(Boolean).join('<br>')+'</div>':'')+boardHTML(r,-1,l)+'<div class="total"><span class="mute">Score final</span><b>'+sc.total+'</b></div></div>';
+  h+='<div class="card"><h2>Partie du '+esc(when)+'</h2>'+((g.m&&g.m!=='E')||g.ctx||(g.bs&&g.bs.length)?'<div class="small mute" style="margin:-4px 0 8px">'+[(g.m&&g.m!=='E')?MODES[g.m]+(g.ev?' · '+esc(g.ev):''):'',g.ctx?[g.ctx.c,(g.bs&&g.bs.length)?gameBalls(g).join(' → '):g.ctx.b,wLbl(g.ctx.w),g.ctx.o,g.ctx.q].filter(Boolean).map(esc).join(' · '):(g.bs&&g.bs.length?gameBalls(g).map(esc).join(' → '):'')].filter(Boolean).join('<br>')+'</div>':'')+boardHTML(r,-1,l,ui.demo?null:g.id)+'<div class="total"><span class="mute">Score final</span><b>'+sc.total+'</b></div>'+(ui.demo?'':'<div class="small mute" style="margin-top:6px">Une erreur ? Touche la frame à corriger.</div>')+'</div>';
+  if(ui.fe&&ui.fe.k===g.id)h+=feCard();
+  if(!ui.demo)h+=gEditCard(g);
   h+='<div class="tiles"><div class="tile"><b>'+st+'</b><span>Strikes</span></div><div class="tile"><b>'+sp+'/'+(sp+op)+'</b><span>Spares réussis</span></div><div class="tile"><b>'+op+'</b><span>Frames ouvertes</span></div></div>';
   let rows='';
   for(let f=0;f<10;f++){
@@ -1103,6 +1213,71 @@ function gameDetail(g){
     +'<div class="small mute" style="margin-top:8px">Première boule : '+(fb?(fp/fb).toFixed(1):'—')+' quilles en moyenne.</div></div>';
   if(!ui.demo)h+='<div style="text-align:center"><button class="link" data-act="gdel" data-id="'+esc(g.id)+'">'+(ui.delId===g.id?'Confirmer la suppression':'Supprimer cette partie')+'</button></div>';
   return h;
+}
+
+/* ---------- correction d'une frame / d'une partie ---------- */
+function feSrc(k){return k==='cur'?state.current:state.games.find(x=>x.id===k);}
+function feInfo(){
+  const fe=ui.fe,o=feSrc(fe.k);if(!o)return null;
+  const fi=frameIdx(o.r),ids=fi[fe.f],start=ids.length?ids[0]:o.r.length;
+  const test=o.r.slice(0,start).concat(fe.rolls),ns=nextState(test);
+  return{o,ids,start,ns,done:ns.done||ns.frame>fe.f,test};
+}
+function feOpen(k,f){
+  const o=feSrc(k);if(!o)return;
+  const ids=frameIdx(o.r)[f],L=o.l||{};
+  ui.fe={k,f,rolls:[],l:{},pend:null,sel:[],old:ids.map(i=>o.r[i]),oldL:ids.map(i=>L[i]||null)};
+  ui.delId=null;ui.pend=null;ui.sel=[];
+}
+function feCard(){
+  const fe=ui.fe,I=feInfo();if(!I)return'';
+  const sbt=standingBefore(I.test).slice(I.start);
+  const got=fe.rolls.length?fe.rolls.map((p,j)=>sym(p,sbt[j])).join(' '):'—';
+  const was=fe.old.length?fe.old.map((p,j)=>sym(p,standingBefore(I.o.r)[I.start+j])).join(' '):'—';
+  let h='<div class="card" style="border-color:var(--warn)"><h2>Corriger la frame '+(fe.f+1)+'</h2><div class="small mute" style="margin-bottom:8px">Avant : <b>'+was+'</b> · nouvelle saisie : <b>'+got+'</b></div>';
+  if(fe.pend!==null){
+    const need=I.ns.standing;
+    const row=a=>'<div>'+a.map(p=>'<button class="pin'+(fe.sel.includes(p)?' on':'')+'" data-act="fe-pin" data-p="'+p+'">'+p+'</button>').join('')+'</div>';
+    h+='<div class="small mute">Quilles restées debout ? ('+fe.sel.length+'/'+need+')'+(fe.sel.length===need&&isSplit(fe.sel)?' · <b>split</b>':'')+'</div><div class="pins">'+row([7,8,9,10])+row([4,5,6])+row([2,3])+row([1])+'</div>'
+      +'<div class="row2"><button class="btn primary" data-act="fe-leave"'+(fe.sel.length===need?'':' disabled')+'>Valider</button><button class="btn" data-act="fe-skip">Passer</button></div>';
+  }else if(!I.done){
+    h+='<div class="small mute" style="margin-bottom:6px">Boule '+(fe.rolls.length+1)+' : combien de quilles tombées ?</div><div class="pad">';
+    for(let v=0;v<=10;v++){const dis=v>I.ns.standing,last=v===I.ns.standing;h+='<button data-act="fe-roll" data-v="'+v+'"'+(dis?' disabled':'')+(last&&v>0?' class="x"':'')+'>'+(last&&v>0?(I.ns.standing===10?'X':'/'):v)+'</button>';}
+    h+='<button class="undo" data-act="fe-back"'+(fe.rolls.length?'':' disabled')+'>↶ Annuler</button></div>';
+  }else{
+    h+='<button class="btn primary block" data-act="fe-ok">Valider la correction</button>';
+  }
+  return h+'<div style="text-align:center;margin-top:6px"><button class="link" data-act="fe-cancel">Fermer sans modifier</button></div></div>';
+}
+function feApply(){
+  const fe=ui.fe,I=feInfo();if(!I||!I.done)return;
+  const o=I.o,start=I.start,oldEnd=I.ids.length?I.ids[I.ids.length-1]+1:start,n=fe.rolls.length,delta=n-(oldEnd-start);
+  const newR=o.r.slice(0,start).concat(fe.rolls,o.r.slice(oldEnd));
+  if(fe.k!=='cur'&&!nextState(newR).done){toast('Correction incomplète');return;}
+  const L=o.l||{},nl={};
+  Object.keys(L).forEach(k=>{k=+k;if(k<start)nl[k]=L[k];else if(k>=oldEnd)nl[k+delta]=L[k];});
+  let same=true;
+  for(let j=0;j<n;j++){
+    same=same&&fe.old[j]===fe.rolls[j];
+    if(fe.l[j]!==undefined){if(fe.l[j])nl[start+j]=fe.l[j];}
+    else if(same&&fe.oldL[j])nl[start+j]=fe.oldL[j];
+  }
+  const sb=standingBefore(newR),nr=nextState(newR);
+  Object.keys(nl).forEach(k=>{k=+k;const st=sb[k]===10&&newR[k]<10?10-newR[k]:-1;if(!nl[k]||nl[k].length!==st)delete nl[k];});
+  if(o.bs)o.bs=o.bs.map(x=>({i:x.i<=start?x.i:x.i>=oldEnd?x.i+delta:Math.min(x.i,start+n),b:x.b}));
+  o.r=newR;o.l=nl;
+  if(fe.k!=='cur'){o.s=score(newR).total;o.e=new Date().toISOString();}
+  ui.fe=null;ui.pend=null;ui.sel=[];persist();render();toast(fe.k==='cur'?'Frame corrigée':'Partie corrigée : '+o.s);
+}
+function gEditCard(g){
+  const m=g.m||'E',x=g.ctx||{};
+  const cs=Array.from(new Set(ctxKnown('c').concat(BOW.map(bowLbl))));
+  return'<div class="card"><h2>Modifier la partie</h2><div class="small mute" style="margin-bottom:4px">Type de partie</div>'
+    +'<div class="seg" style="display:flex;width:100%;margin-bottom:8px">'+['E','L','T'].map(k=>'<button style="flex:1;padding:9px 2px" data-act="gm-mode" data-m="'+k+'" class="'+(m===k?'on':'')+'">'+MODES[k]+'</button>').join('')+'</div>'
+    +(m!=='E'?'<input class="txt" id="gev" placeholder="'+(m==='L'?'Nom de la ligue':'Nom du tournoi')+'" value="'+esc(g.ev||'')+'" maxlength="30">':'')
+    +'<div class="small mute" style="margin:6px 0 4px">Centre de bowling</div><input class="txt" id="gctxc" list="gbowl" placeholder="Ville ou nom du bowling" value="'+esc(x.c||'')+'" maxlength="60" autocomplete="off"><datalist id="gbowl">'+cs.map(v=>'<option value="'+esc(v)+'">').join('')+'</datalist>'
+    +'<div class="small mute" style="margin:6px 0 4px">Poids de la boule</div><select id="gctxw" style="width:100%"><option value="">Non précisé</option>'+[8,9,10,11,12,13,14,15,16].map(w=>'<option value="'+w+'"'+(+x.w===w?' selected':'')+'>'+wLbl(w)+'</option>').join('')+'</select>'
+    +'<div class="small mute" style="margin-top:8px">Les changements sont enregistrés tout de suite et tes stats sont recalculées.</div></div>';
 }
 
 /* ---------- modes : entraînement, ligue, tournoi ---------- */
@@ -1197,7 +1372,7 @@ function viewHome(){
   return h;
 }
 
-const BOW_RAW=["01|Bourg-en-Bresse|FirstBowl|12 rue Barthélémy Thimonnier, ZI Cenord|12|46.21|5.23", "01|Saint-Denis-lès-Bourg|Bowling Bresse Loisirs|1880 avenue de Trévoux|16|46.20|5.19", "01|Culoz||Avenue Jean Falconnier|6|45.85|5.78", "01|Saint-Genis-Pouilly|New Chêne Club|ZA de l'Allondon, rue de la Faucille|10|46.24|6.02", "01|Vaux-en-Bugey|B Cube|ZAE de Juyères|12|45.90|5.33", "02|Hirson||ZAC du Taillis|8|49.92|4.08", "02|Laon|Le Magic Bowling|2 rue Nicolas Appert|12|49.57|3.62", "02|Saint-Quentin|La Bul|4 rue Lamartine|12|49.85|3.29", "02|Soissons|Au Bureau|8 place de la République|6|49.38|3.32", "02|Neuilly-Saint-Front|Bowling de Louvroy|Rue Jean Racine|8|49.17|3.26", "03|Avermes|Luna Bowl (L'Enjoy)|Chemin des Maisons Neuves, RN 7|12|46.58|3.35", "03|Prémilhat||138 avenue des Martyrs|12|46.32|2.64", "03|Cusset||4 rue Ampère, ZI|14|46.13|3.45", "04|Uvernet-Fours|Le Bowling du Bachelard|Le pied de la Maure, route de la Cayolle|6|44.39|6.65", "04|Digne-les-Bains|Euroloisirs|ZI Saint-Christophe, route de Marseille|6|44.09|6.24", "05|Gap|Le Canadien|ZI Tokoro|8|44.55|6.08", "05|Orcières|Palais des Sports||6|44.69|6.33", "06|Cannes (La Bocca)|Cannes Bowling|189 boulevard Francis Tonner|16|43.55|6.96", "06|Nice|Bowling Acropolis|5 esplanade Kennedy|24|43.70|7.28", "06|Antibes||575 première avenue, Nova Antipolis|22|43.62|7.05", "07|Annonay||Rue Mathieu Duret|10|45.24|4.67", "07|Aubenas||47 boulevard du Maréchal Leclerc|6|44.62|4.39", "07|Ruoms|Château du Rouret||10|44.43|4.34", "07|Vallon-Pont-d'Arc|Azur Bowling|La Selle|8|44.40|4.39", "08|Charleville-Mézières|Central Park|ZI Montjoly|16|49.76|4.70", "08|Givet|Centre aqualudique Rivéa|Route de Beauraing|6|50.14|4.82", "08|Lumes|Le Clair de Lumes|Rue des Mines|6|49.74|4.80", "08|Vireux-Wallerand||32 bis place des Tries|2|50.08|4.73", "09|Pamiers|Pamiers Bowling|23 rue Frédéric Soulié|5|43.12|1.61", "09|Pamiers|Le Canounges|Rue André Citroën|6|43.11|1.63", "10|Troyes|Bowling des 3 Seine|15 rue des Bas Trévois|18|48.30|4.08", "11|Carcassonne|Bowling du Languedoc|Plateau de la Grazaille, route de Mazamet|8|43.22|2.33", "11|Narbonne|Espace Liberté|RN 9, route de Perpignan|12|43.17|3.00", "12|Millau||ZAC du Cap de Grès|6|44.10|3.08", "12|Onet-le-Château|Espace Saint-Marc|Route d'Espalion|12|44.38|2.58", "12|Villefranche-de-Rouergue||16 allée Aristide Briand|4|44.35|2.04", "13|Aix-en-Provence|Bowling du Bras d'Or|23 boulevard Albert Charrier|10|43.50|5.40", "13|Arles||Zone tertiaire Fourchon|8|43.67|4.63", "13|Aubagne|Le Bras d'Or|Avenue Simon Lagunas|10|43.29|5.58", "13|Aubagne|Bowling Karting Indoor Provence|1985 chemin de la Vallée|6|43.28|5.55", "13|Istres|La Pyramide|ZAC des Salles|12|43.51|4.99", "13|Les Pennes-Mirabeau|Bowlingstar Plan de Campagne|Chemin des Pennes au Pin|36|43.41|5.34", "13|Marseille|Valentine|12 route de la Sablière|28|43.29|5.49", "13|Martigues||ZAC de Figuerolles|16|43.41|5.05", "13|Salon-de-Provence|Bowlingstar|Place Jules Morgan|12|43.64|5.10", "13|Vitrolles||19 boulevard de l'Europe|8|43.45|5.25", "14|Mondeville|Bowling du Calvados|6 rue Charles Coulomb|22|49.17|-0.31", "14|Courseulles-sur-Mer|Bowling de la Mer|Place du 6 Juin|8|49.33|-0.46", "14|Touques||83 rue du Val d'Auge|12|49.36|0.11", "14|Honfleur|La Fosserie|ZA du Plateau|12|49.40|0.24", "14|Lisieux||69 rue de Paris|8|49.14|0.23", "14|Villers-sur-Mer||6-8 rue des Grives|3|49.32|0.00", "14|Vire|Bowling de Vire|Rue de la Petite Vitesse|12|48.84|-0.89", "15|Aurillac||104 avenue du Général Leclerc|8|44.93|2.44", "15|Ytrac|Pitchoun Lounge|ZAC du Puy d'Esban|8|44.90|2.40", "16|Angoulême||528 route de Bordeaux|16|45.62|0.14", "16|Châteaubernard|Cognac Bowling|1 rue du Commerce|12|45.68|-0.33", "17|La Rochelle||Port des Minimes, ZAC Minimes|18|46.14|-1.17", "17|Saintes||Rue des Rochers|10|45.75|-0.63", "17|Meschers-sur-Gironde|Family Fun Bowling|49 route de Semussac|12|45.56|-0.95", "17|Dolus-d'Oléron|L'Abordage|Zone commerciale de la Jarrie|8|45.91|-1.26", "18|Bourges|Bowling du Prado|Rue Pré Doulet|15|47.09|2.40", "18|Saint-Doulchard|Espace Bowling|Le Briou, route d'Orléans|16|47.10|2.35", "18|Vierzon|L'Enjoy Bowling|Rue de la Société Française|16|47.22|2.07", "19|Brive-la-Gaillarde|Bowling Briviste|6 avenue Léo Lagrange|10|45.16|1.53", "2A|Ajaccio|Santa Lina|Route des Sanguinaires|6|41.92|8.70", "2A|Lecci|Corsica Game|Mulinaccio|6|41.66|9.35", "2B|Furiani||Lenza Lugha, RN 193|10|42.66|9.43", "21|Beaune||4 rue Buffon, ZAC de la Porte de Beaune|12|47.04|4.84", "21|Dijon|Euro Bowling|19 rue Marguerite Yourcenar|20|47.31|5.07", "21|Marsannay-la-Côte|Marsannay la Côte|806 rue de la Pièce Cornue|26|47.27|5.00", "22|Taden|Le Bélem|8 rue de la Tramontane, zone des Alleux|10|48.46|-2.03", "22|Lannion|L'Éclipse|ZC Le Lion, rond-point Saint-Marc|10|48.74|-3.45", "22|Perros-Guirec|Les Haubans|41 rue de Pleumeur|10|48.81|-3.44", "22|Saint-Brieuc|Le Cyclope|14 rue de Paris|8|48.51|-2.76", "22|Trégueux||3 rue Louis Malle, espace loisirs Brézillet|20|48.48|-2.74", "24|Saint-Laurent-des-Vignes||Route de Bordeaux|10|44.84|0.52", "24|Trélissac|Snook-Bowl Palace|ZC la Feuilleraie|10|45.19|0.77", "24|Sarlat|Bowling Losmoz|Lieu-dit Prends-Garde|8|44.90|1.22", "25|Besançon||4 route de Marchaux|24|47.26|6.04", "25|Besançon|Ducky Bowling (Châteaufarine)|ZAC de Châteaufarine, rue G. Apollinaire|12|47.25|5.98", "25|Audincourt|Bowling 25 (Forges)|ZA les Forges, 17 rue Four Martin|10|47.49|6.84", "25|Audincourt|Star Bowl (Espace Lumière)|Rue de la Naille|16|47.48|6.85", "25|Les Fins||Rue du Calvaire|10|47.06|6.62", "25|Pontarlier||1 rue Hélène Boucher, ZA des Grands Planchants|8|46.91|6.34", "26|Saint-Paul-Trois-Châteaux|Saint-Paul 2003 (B Best)|Centre sportif Les Migesolles|12|44.35|4.77", "26|Valence||Chemin de l'Epervière|12|44.92|4.90", "27|Évreux|Le Parvis Bowling|2 rue Franklin Roosevelt|10|49.02|1.15", "27|Louviers|Le Kolisé|23 avenue François Mitterrand|8|49.22|1.17", "28|Barjouville|Xbowl|17 rue Pierre Missigault, ZA|16|48.43|1.46", "28|Nogent-le-Rotrou|Aquaval|Rue Saint-Hilaire|8|48.32|0.82", "29|Brest|Le Master|Avenue Georges Pompidou|16|48.41|-4.46", "29|Carhaix-Plouguer|Strikart|Dépendances de Pervisiens|10|48.27|-3.57", "29|Quimper|Le Master|59 rue du Président Sadate|12|47.99|-4.09", "29|Mellac|Keringant Kervidanou||10|47.87|-3.58", "29|Saint-Martin-des-Champs|Le Corsaire|Parc d'activités du Launay|12|48.60|-3.84", "30|Alès|Bowling des Cévennes|Rocade Sud, 1639 chemin des Sports|10|44.12|4.08", "30|Caissargues|Zone Euro 2000|Chemin de Grande Terre|16|43.81|4.37", "30|Nîmes|Space Bowling|ZA Mas des Abeilles, 130 rue Michel Debré|20|43.80|4.31", "31|Toulouse|Bowling de Labège|1 impasse Louise Labé, route de Labège|28|43.56|1.48", "31|Toulouse|Centre commercial Gramont|Chemin de Gabardie, RN 12|26|43.64|1.48", "31|Toulouse|Bowling des Minimes|108 bis avenue des Minimes|14|43.63|1.43", "32|Auch|Bowling d'Auch|134 rue Victor Hugo|10|43.65|0.59", "33|Gujan-Mestras|Bowling Star|Lotissement Bâton Rouge|16|44.64|-1.07", "33|Bègles|Bowling des Rives d'Arcins|Chemin de Courréjean|24|44.79|-0.55", "33|Bordeaux||Place Général Koenig|16|44.83|-0.57", "33|Bordeaux|Kart System (Lac)|2 rue du Grand Barrail|20|44.89|-0.57", "33|Libourne||23 avenue Henri Brulle|6|44.92|-0.24", "33|Mérignac||244 avenue de la Marne|24|44.84|-0.65", "34|Sauvian||Route de Béziers|8|43.30|3.26", "34|Villeneuve-lès-Béziers|Xtreme Bowling|ZAC de la Montagnette, Cap Floride|8|43.32|3.28", "34|Montpellier||662 avenue de la Pompignane|16|43.62|3.90", "34|Montpellier|Odysseum|ZAC Odysseum, 20 place de Venise|40|43.60|3.92", "35|Dol-de-Bretagne||Rue de la Rouelle, ZA les Rolandières|12|48.55|-1.75", "35|Fougères||Rue du Dr Bertin, Forum de la Gare|10|48.35|-1.20", "35|Rennes|Alma Loisir|2 rue du Bosphore|16|48.12|-1.62", "35|La Mézière|Bowl Center Cap Malo|Cap Malo|24|48.22|-1.74", "35|Vitré|Le Skittle|1 rue Alessandro Volta|8|48.12|-1.21", "36|Châteauroux|Cyber Bowling|13 avenue Parc des Loisirs, Belle-Isle|12|46.80|1.69", "36|Issoudun|Centre sportif municipal||6|46.95|2.00", "37|Tours|SilverBowl Tours|28 avenue Marcel Mérieux|20|47.40|0.70", "38|Chatte||RN 92, la Gloriette|4|45.12|5.28", "38|Les Deux Alpes||Place de Venosc|6|45.01|6.12", "38|Les Deux Alpes|La Meije|20 hameau La Meije|8|45.01|6.12", "38|Échirolles|Bowl Center|19 avenue de Grugliasco|32|45.15|5.72", "38|Estrablin||Carrefour de l'Abbaye|8|45.53|4.97", "38|Villard-de-Lans||101 chemin de la Patinoire|4|45.07|5.55", "39|Brevans||ZA Grande Coube|7|47.07|5.46", "39|Prémanon|Le Bowling|146 rue Croix de la Teppe|12|46.49|6.00", "39|La Chaumusse|Sitting Bowl|5 route des Curtillats|6|46.58|5.92", "40|Saint-Paul-lès-Dax|Casino César Palace||8|43.73|-1.07", "40|Capbreton|Bowling du Port|Rue Maurice Martin, ZAC de la Pêcherie|8|43.64|-1.43", "41|Blois||25 rue Robert Nau|20|47.59|1.33", "42|Savigneux|Forez Bowling|La Bruyère|10|45.62|4.06", "42|Riorges|Bowling Espace Loisir|578 avenue du Général de Gaulle|12|46.04|4.04", "42|Saint-Étienne|Le Flore|31 boulevard Jules Janin|12|45.43|4.39", "42|Villars|Inside Park|85 chemin de la Côte|18|45.49|4.35", "43|Saint-Christophe-sur-Dolaizon|L'Odyssée|ZA la Clé des Champs|10|45.02|3.85", "43|Yssingeaux|Planète Bowling|ZA de la Guide|8|45.14|4.12", "44|Carquefou|Bowling de l'Erdre|La Charmelière|10|47.30|-1.49", "44|Châteaubriant||Place Ernest Bréant|6|47.72|-1.37", "44|Guérande|Presqu'île Bowling|Avenue Gustave Flaubert, ZAC Kerbiniou|14|47.33|-2.43", "44|Nantes||Boulevard du Petit Port|16|47.24|-1.55", "44|Saint-Géréon||Boulevard de la Prairie|12|47.40|-1.27", "44|Saint-Herblain|Bowl Center Atlantis|Rue du Moulin de la Rousselière|32|47.22|-1.63", "44|Saint-Nazaire||ZAC Océanis, allée de la Mer d'Iroise|16|47.27|-2.20", "44|Saint-Sébastien-sur-Loire|EuroBowl|27 rue Marie Curie, ZAC des Gripots|26|47.20|-1.50", "45|Amilly|Bowling d'Anilly|335 rue Vernisson, ZAC Sud|16|48.00|2.76", "45|Orléans||2 rue Moreau|20|47.90|1.91", "45|Saran|Le Complex|1 rue de la Tuilerie|24|47.95|1.88", "46|Cahors|Bowling Cadurcien|Belle-Croix, route de Toulouse|8|44.43|1.43", "47|Boé||Route d'Auch, ZAC Rigoulet|8|44.19|0.62", "47|Allez-et-Cazeneuve|Bowling du Sud-Ouest|Laplagne|8|44.39|0.68", "49|Angers|Colibowl|8 bis boulevard Maréchal Foch|10|47.47|-0.55", "49|Beaucouzé|Silver Bowl|ZA du Landreau|24|47.47|-0.63", "49|Cholet|Bowling du Stadium|34 rue d'Anjou|14|47.06|-0.88", "49|Sainte-Gemmes-sur-Loire|Red Bowl|ZAC de Ver-nusson|12|47.41|-0.57", "49|Saumur||52-56 route de Rouen|6|47.26|-0.07", "50|Cherbourg||Port Chantereyne|12|49.64|-1.62", "50|Saint-Pierre-de-Coutances|Le Yéti|2 rue des Carrières Saint-Michel|8|49.05|-1.44", "50|Donville-les-Bains|L'Hermitage|Rue de la Plage|6|48.85|-1.57", "50|Saint-Lô|Le Macao|Centre commercial, rue Octave Feuillet|6|49.12|-1.09", "50|Marcey-les-Grèves||31 rue Le Pavé|8|48.70|-1.35", "51|Châlons-en-Champagne||Rue Michel Ménard, ZA Escarnotières|24|48.95|4.37", "51|Épernay||30 rue Marcel Paul|12|49.04|3.96", "51|Tinqueux||ZAC Moulin de l'Écaille, 16 rue N. Appert|34|49.25|3.99", "51|Taissy||6 rue Édouard Branly|8|49.20|4.08", "51|Thillois|Vegas Bowling|Parc Millésime, ZAC de Thillois|22|49.23|3.98", "52|Chaumont|Le Strike 20|Route de Neuilly|12|48.11|5.14", "53|Laval|Cap Form|64 rue Henri Bastard|16|48.07|-0.77", "54|Nancy|Magic Bowling|ZAC Meurthe et Canal, 16 rue Georges de la Tour|24|48.69|6.21", "54|Longwy||Avenue de Saintignon|8|49.52|5.76", "54|Pont-à-Mousson||609 rue du Bois le Prêtre|8|48.91|6.05", "54|Vandœuvre-lès-Nancy||Centre commercial Les Nations|16|48.66|6.17", "56|Saint-Avé|SuperBowl|1 rue M. Dassault, ZA Kermelin Toulbaou|14|47.69|-2.73", "56|Locminé||ZA de Kerjean|6|47.90|-2.83", "56|Larmor-Plage||3 rue du Minio|12|47.72|-3.38", "56|Ploërmel|Bowling du Lac|Zone du Lac|12|47.93|-2.40", "56|Noyal-Pontivy||ZA du Goheleve|12|48.07|-2.97", "56|Vannes|Le Master|Parc du Golfe, 7 rue Gilles Gahinet|12|47.64|-2.77", "57|Amnéville|Centre thermal et touristique|Rue des Thermes|16|49.26|6.14", "57|Saint-Julien-lès-Metz|Bowl Factory|14 avenue Paul Langevin|20|49.13|6.21", "57|Augny|Étoile Loisirs|ZAC d'Augny|16|49.06|6.12", "57|Phalsbourg|Le Bowling des 4 Vents|ZA Maison Rouge, rue de l'Europe|18|48.77|7.26", "57|Saint-Avold|Starbowl|ZI du Gros Chêne, 94 rue du Général Altmayer|16|49.10|6.71", "58|Marzy|Euro Bowling / Bowling du Triangle|ZAC de Marzy|10|47.00|3.19", "58|Cosne-sur-Loire|Golden Strike|22 rue du Maréchal Leclerc|6|47.41|2.93", "59|Proville||Rue des Aubépines|2|50.16|3.21", "59|Condé-sur-l'Escaut||Complexe Ludi|8|50.45|3.59", "59|Douai|Le Vauban|193 boulevard Bréguet|16|50.37|3.08", "59|Dunkerque||Sentier de la Vallée|10|51.03|2.38", "59|Gravelines|Sportica|Place du Polder|8|50.99|2.12", "59|Hazebrouck||Avenue de Saint-Omer|14|50.72|2.55", "59|Lille|Metro Bowling|17-25 boulevard Victor Hugo|36|50.63|3.07", "59|Lomme|Planet Bowling|ZA du Grand But|40|50.65|2.99", "59|Ronchin|Family Bowling|Champ du Cerf, rue Vincent Auriol|8|50.60|3.10", "59|Roubaix|Le Cosmos|20-22 rue du Grand Chemin|16|50.69|3.18", "59|Valenciennes|Satellium|20 rue des Vosges|24|50.36|3.52", "59|Villeneuve-d'Ascq|Bowling Van Gogh|1 rue des Vétérans|24|50.62|3.15", "60|Jaux|Karting Bowling|Place Jacques Tati|24|49.40|2.88", "60|Saint-Maximin|Plaza Bowling|ZAC du Bois des Fenêtres|28|49.22|2.45", "61|Argentan||2 rue Tramway|8|48.74|-0.02", "61|Flers||Allée des Éclosets|12|48.75|-0.57", "61|L'Aigle||Avenue Kennedy|6|48.76|0.63", "62|Berck|Complexe nautique L'Agora|Avenue Parmentier|8|50.40|1.57", "62|Béthune|Centre de loisirs|66 avenue P. de Coubertin|8|50.52|2.64", "62|Boulogne-sur-Mer||6 impasse Quéhen|10|50.72|1.61", "62|Bruay-la-Buissière|CD Bowling|Rue des Frères Lumière, ZAC de la Porte Nord|18|50.49|2.55", "62|Calais|Centre de loisirs|Avenue Saint-Exupéry|8|50.95|1.86", "62|Coquelles|Quai 121|Centre commercial Europe|22|50.93|1.81", "62|Hénin-Beaumont|Karting Bowling|ZAC du Bord des Eaux|32|50.42|2.95", "62|Saint-Martin-lez-Tatinghem||Route de Calais|6|50.76|2.24", "63|Clermont-Ferrand||88 avenue du Brézet|34|45.79|3.13", "63|Clermont-Ferrand|Le B.Bowl Center|22 rue de l'Éminée|30|45.79|3.15", "63|Issoire||Rue Jean Monnet|8|45.54|3.25", "63|Le Mont-Dore|Centre sportif municipal||6|45.57|2.81", "64|Bayonne||ZI les Pontots|20|43.50|-1.46", "64|Anglet||1 allée du Cadran, RN 10|16|43.48|-1.50", "64|Lescar|Free Bowl|180 boulevard de l'Europe|16|43.33|-0.43", "64|Pau|Bowling des Pyrénées|222 avenue Jean Mermoz|12|43.32|-0.36", "65|Bordères-sur-l'Échez|Bowling Agora|21 route de Bordeaux|10|43.21|0.10", "66|Argelès-sur-Mer|Plaza Bowl|ZAC les Honors, route du Littoral|12|42.55|3.03", "66|Bolquère|Bowling l'Élan|4 bis avenue du Serrat de l'Ours|10|42.50|2.00", "66|Les Angles||92 avenue Mont-Louis|4|42.57|2.07", "66|Perpignan|X'Treme Bowling|Les Palmiers, ZAC du Mas Balande|16|42.72|2.88", "67|Strasbourg||Jardin de l'Orangerie|24|48.59|7.77", "67|Wisches||Route du Moulin|4|48.50|7.25", "68|Colmar||1 rue André Kiener|16|48.08|7.38", "68|Mulhouse||3 rue de Metz|16|47.75|7.34", "68|Wittelsheim|Cristal Bowling|Zone A Heiden, 6 rue des Pays-Bas|36|47.80|7.24", "69|Brignais|Bowling de l'Ouest Lyonnais|Rue de l'Industrie|14|45.67|4.75", "69|Genas|Genas Bowling|1 chemin des Mûriers, ZAC|10|45.73|4.72", "69|Lyon 8e|Bowling du 8ème|80 boulevard Marius Berliet|14|45.74|4.88", "69|Lyon 3e|La Part-Dieu|30 boulevard Eugène Deruelle|20|45.76|4.86", "69|Saint-Laurent-de-Chamousset||Escapade Le Pontet|6|45.74|4.46", "69|Villefranche-sur-Saône||1051 boulevard Burdeau|10|45.99|4.73", "70|Pusey|Le Strike|ZA de l'Oasis|8|47.63|6.13", "71|Autun||Route de Chalon, face au lac|8|46.95|4.31", "71|Mâcon||105 allée Jean Bouin|14|46.30|4.83", "71|Montchanin|Bowling du Vieux Saule|Rond-point de Torcy|8|46.76|4.45", "72|Le Mans||56-58 boulevard Nicolas Cugnot|26|48.00|0.20", "72|La Flèche|Le Laser Bowl|ZAC de La Monnerie, allée des Gabares|8|47.70|-0.07", "72|Solesmes||Rue de la Denisière|6|47.84|-0.30", "72|Arçonnay||18 route du Mans|12|48.45|0.12", "73|Albertville|Bowling 3000|115 chemin du Pont d'Albertin|6|45.67|6.39", "73|Voglans|IBowling|Rue Françon|18|45.62|5.88", "73|Courchevel|Bowling International Courchevel 1850||8|45.41|6.63", "73|Lanslevillard|Bowling des 1480|Les Glières|6|45.29|6.90", "73|La Plagne|Bowling||4|45.51|6.68", "73|Montvalezan|Bowling Les Euchers / La Rosière||6|45.63|6.85", "73|Les Arcs 2000|Le Vaset||6|45.57|6.82", "73|Bourg-Saint-Maurice|Les Arcs 1800||8|45.62|6.77", "73|Les Chavannes-en-Maurienne|L'Aiguillon||8|45.31|6.33", "73|Méribel|Centre sportif La Chaudane||6|45.40|6.57", "73|Tignes|Bowling Center|Chalet Aubry|12|45.47|6.91", "73|La Toussuire||Les Plans|6|45.25|6.26", "73|Valloire||Base de loisirs|6|45.17|6.43", "73|Valmeinier|Bow Ski, espace culturel||4|45.20|6.48", "73|Val Thorens|KJP Loisir|Place de l'Arche|10|45.30|6.58", "74|Annecy|Annecy Bowling Club|9 bis boulevard du Fier|16|45.90|6.12", "74|Annemasse|Bowling de l'Aérodrome|1 rue de l'Industrie|12|46.19|6.24", "74|Avoriaz|Le Studio||2|46.19|6.77", "74|Chamonix||Avenue de Courmayeur|8|45.92|6.87", "74|Châtel||Le Vieux Four|4|46.27|6.84", "74|Flaine|Castel Bowling|Galerie marchande|6|46.00|6.69", "74|Les Gets||Le Chouca|2|46.16|6.67", "74|Demi-Quartier (Megève)||Route de Sallanches|8|45.86|6.62", "74|Morzine|Capitale II||3|46.18|6.71", "74|Sallanches|Le Laser Game|531-533 rue du Capitaine Bulle|10|45.94|6.63", "74|Sévrier||3563 route d'Albertville|12|45.86|6.14", "74|Margencel|Margencel Loisirs|Lieu-dit Les Cys, 560 route du Crêt Gojon|20|46.33|6.40", "75|Paris 5e|Mouffetard|13 rue Gracieuse|8|48.84|2.35", "75|Paris 14e|Montparnasse|25 rue du Commandant René Mouchotte|16|48.84|2.32", "75|Paris 15e|Front de Seine|11-21 rue Gaston de Caillavet|20|48.85|2.28", "75|Paris 16e|Étoile Foch|8 avenue Foch|16|48.87|2.29", "75|Paris 17e|Champerret|2 rue du Caporal Peugeot|18|48.89|2.29", "75|Paris 18e|La Chapelle|6 avenue de la Porte de la Chapelle|24|48.90|2.36", "76|Amfreville-la-Mivoie|BBA|177 route de Paris|8|49.43|1.14", "76|Dieppe||Centre commercial du Belvédère|8|49.92|1.08", "76|Le Grand-Quevilly|Le Bois Cany|22 boulevard Pierre Brossolette|28|49.41|1.04", "76|Le Havre||47 rue François Mazeline|12|49.49|0.12", "76|Montivilliers|Le Looping|6 rue des Hérons|18|49.55|0.19", "76|Notre-Dame-de-Gravenchon||3 rue Jean Maridor|4|49.50|0.57", "76|Rouen||130 rue de Constantine|16|49.44|1.09", "77|Brie-Comte-Robert|L'Univers|10 rue Léonard de Vinci, ZA la Haie Passart|12|48.69|2.61", "77|Chelles||74 rue Auguste Meunier|12|48.88|2.60", "77|Coulommiers|L'Uzine|6 rue des Margrats|16|48.81|3.09", "77|Lieusaint|Star Bowling|Carré Sénart, 18-20 allée du Trait d'Union|32|48.63|2.55", "77|Moussy-le-Neuf|Escape Factory|8 avenue des 22 Arpents|20|49.00|2.65", "77|Poincy||Rue de la Briquetière, ZI Entrepôt Piot|8|48.97|2.85", "77|Ozoir-la-Ferrière|Le City Bowling|1 rue de la Ferme du Presbytère|20|48.76|2.67", "77|Provins||9 rue Georges Dromigny|8|48.56|3.30", "77|Souppes-sur-Loing|Les Varennes|Rue du Lavoir|12|48.18|2.73", "78|Coignières|Le Krypton|20 chemin rural, centre commercial des Borderies|10|48.75|1.92", "78|Conflans-Sainte-Honorine|Speedpark|ZA des Boutries, 18 rue de l'Hautil|40|49.00|2.09", "78|Houdan|Bowling Star Houdan|Route de Bû|12|48.79|1.60", "78|Mantes-la-Ville||71 rue Marcel Sembat|8|48.99|1.70", "78|Maurepas||3 avenue Louis Pasteur|20|48.77|1.95", "78|Montigny-le-Bretonneux||1 avenue de la Source de la Bièvre|18|48.77|2.03", "78|Orgeval|BowlCenter|Centre commercial d'Orgeval, 2050 route de Quarante Sous|30|48.93|1.99", "78|Rambouillet||ZAC du Bel Air, 1 rue Hippolyte Mège-Mouriès|18|48.64|1.83", "79|Bressuire|Bocabowl|Bocapole|12|46.84|-0.49", "80|Abbeville||Rue Macqueron, parc d'activité des 2 Vallées|8|50.11|1.83", "80|Albert||Avenue Faidherbe|6|50.00|2.65", "80|Camon|Bowling de Picardie|Route de Corbie|18|49.88|2.35", "80|Mers-les-Bains||Rond-point de Froideville|14|50.07|1.40", "81|Albi||Le Séquestre, chemin des Taillades|8|43.91|2.15", "81|Castres|Le Stadium|Cours l'Espinassette, Les Salvages|8|43.62|2.24", "82|Montauban||RN 20, route de Paris|14|44.03|1.37", "83|Bandol||Route du Beausset, ZI la Repe|16|43.14|5.76", "83|Draguignan|Bowling 2000|Centre commercial Saint-Léger|8|43.54|6.47", "83|Fréjus||2 route de Bagnols, Lou Gabian|8|43.45|6.74", "83|Grimaud||RN 98, Saint-Pons-les-Mûres|8|43.28|6.55", "83|La Garde|Bowling de Provence|563 chemin des Plantades|28|43.13|6.01", "84|Avignon|Bowling Promotion|1 avenue Paul Claudel|16|43.93|4.81", "84|Le Pontet|Bowling du Pontet|Chemin des Petits Rougiers|22|43.96|4.86", "85|Challans|Bowling Cosmos|3 rue Marcel Pagnol, route de Nantes|8|46.85|-1.88", "85|La Roche-sur-Yon|Bowling du Parc|Boulevard Don Quichotte, ZAC les Oudairies|14|46.69|-1.43", "85|Les Sables-d'Olonne|Le Régency|10 boulevard du Souvenir Français, Port Olona|10|46.50|-1.78", "86|Buxerolles|EuroBowl|Rue des Frères Lumière|22|46.61|0.37", "86|Civaux|Abyssea|Route du Fond d'Orveau|8|46.45|0.65", "86|Poitiers|Bowling de Beaulieu|2 avenue Lafayette|10|46.58|0.36", "87|Feytiat|Bowling Club Limousin|Route de Toulouse|20|45.82|1.33", "87|Chaillac-sur-Vienne|L'Éclipse||10|45.87|0.95", "88|Contrexéville|Happy Bowling|745 avenue des Pierrottes|12|48.18|5.90", "88|Épinal||4 rue de la Côte Cabiche|12|48.18|6.45", "88|Gérardmer|Bowling Bar Quai du Locle|7 rue des Pêcheurs|6|48.07|6.88", "88|Saint-Dié-des-Vosges||Rue du 11 novembre 1918|4|48.28|6.95", "89|Monéteau|Aux 2B|ZA de Macherin|20|47.85|3.58", "89|Saint-Clément|Cap Loisir 89|2 rue de la Gaillarde|8|48.20|3.30", "90|Belfort|Bowling des 4 As|Centre commercial des 4 As|16|47.64|6.84", "91|Boussy-Saint-Antoine||Centre commercial Val d'Yerres 2|12|48.69|2.54", "91|La Norville|Le Stadium|22 allée de la Mare Jacob|16|48.59|2.27", "92|Courbevoie|Centre Olympique Charras|15 rue Auguste Beau|12|48.90|2.25", "93|Épinay-sur-Seine|Le Canyon|8 rue Henri Wallon|8|48.95|2.31", "94|Fontenay-sous-Bois||La Matène, 12 rue de la Matène|16|48.85|2.48", "94|Joinville-le-Pont|BG Maxe|162 allée des Guinguettes|16|48.82|2.47", "94|Nogent-sur-Marne|BG M. Chevalier|Square Tino Rossi|12|48.84|2.47", "94|Thiais|Belle Épine|3 rue des Alouettes|32|48.76|2.37", "95|Cergy||Centre commercial Les 3 Fontaines|12|49.04|2.05", "95|Franconville||25 avenue des Marais|12|49.00|2.23", "95|Saint-Gratien|Le Stadium|23 avenue Berthie Albrecht|16|48.97|2.28", "971|Baie-Mahault||Z.I. de Jarry|6|16.26|-61.59", "973|Rémire-Montjoly|Hôtel Beauregard||6|4.89|-52.27", "974|Saint-Denis (La Réunion)||Boulevard Vauban|12|-20.88|55.45"];
+const BOW_RAW=["01|Bourg-en-Bresse|FirstBowl|12 rue Barthélémy Thimonnier, ZI Cenord|12|46.21|5.23", "01|Saint-Denis-lès-Bourg|Bowling Bresse Loisirs|1880 avenue de Trévoux|16|46.20|5.19", "01|Culoz||Avenue Jean Falconnier|6|45.85|5.78", "01|Saint-Genis-Pouilly|New Chêne Club|ZA de l'Allondon, rue de la Faucille|10|46.24|6.02", "01|Vaux-en-Bugey|B Cube|ZAE de Juyères|12|45.90|5.33", "02|Hirson||ZAC du Taillis|8|49.92|4.08", "02|Laon|Le Magic Bowling|2 rue Nicolas Appert|12|49.57|3.62", "02|Saint-Quentin|La Bul|4 rue Lamartine|12|49.85|3.29", "02|Soissons|Au Bureau|8 place de la République|6|49.38|3.32", "02|Neuilly-Saint-Front|Bowling de Louvroy|Rue Jean Racine|8|49.17|3.26", "03|Avermes|Luna Bowl (L'Enjoy)|Chemin des Maisons Neuves, RN 7|12|46.58|3.35", "03|Prémilhat||138 avenue des Martyrs|12|46.32|2.64", "03|Cusset||4 rue Ampère, ZI|14|46.13|3.45", "04|Uvernet-Fours|Le Bowling du Bachelard|Le pied de la Maure, route de la Cayolle|6|44.39|6.65", "04|Digne-les-Bains|Euroloisirs|ZI Saint-Christophe, route de Marseille|6|44.09|6.24", "05|Gap|Le Canadien|ZI Tokoro|8|44.55|6.08", "05|Orcières|Palais des Sports||6|44.69|6.33", "06|Cannes (La Bocca)|Cannes Bowling|189 boulevard Francis Tonner|16|43.55|6.96", "06|Nice|Bowling Acropolis|5 esplanade Kennedy|24|43.70|7.28", "06|Antibes||575 première avenue, Nova Antipolis|22|43.62|7.05", "07|Annonay||Rue Mathieu Duret|10|45.24|4.67", "07|Aubenas||47 boulevard du Maréchal Leclerc|6|44.62|4.39", "07|Ruoms|Château du Rouret||10|44.43|4.34", "07|Vallon-Pont-d'Arc|Azur Bowling|La Selle|8|44.40|4.39", "08|Charleville-Mézières|Central Park|ZI Montjoly|16|49.76|4.70", "08|Givet|Centre aqualudique Rivéa|Route de Beauraing|6|50.14|4.82", "08|Lumes|Le Clair de Lumes|Rue des Mines|6|49.74|4.80", "08|Vireux-Wallerand||32 bis place des Tries|2|50.08|4.73", "09|Pamiers|Pamiers Bowling|23 rue Frédéric Soulié|5|43.12|1.61", "09|Pamiers|Le Canounges|Rue André Citroën|6|43.11|1.63", "10|Troyes|Bowling des 3 Seine|15 rue des Bas Trévois|18|48.30|4.08", "11|Carcassonne|Bowling du Languedoc|Plateau de la Grazaille, route de Mazamet|8|43.22|2.33", "11|Narbonne|Espace Liberté|RN 9, route de Perpignan|12|43.17|3.00", "12|Millau||ZAC du Cap de Grès|6|44.10|3.08", "12|Onet-le-Château|Espace Saint-Marc|Route d'Espalion|12|44.38|2.58", "12|Villefranche-de-Rouergue||16 allée Aristide Briand|4|44.35|2.04", "13|Aix-en-Provence|Bowling du Bras d'Or|23 boulevard Albert Charrier|10|43.50|5.40", "13|Arles||Zone tertiaire Fourchon|8|43.67|4.63", "13|Aubagne|Le Bras d'Or|Avenue Simon Lagunas|10|43.29|5.58", "13|Aubagne|Bowling Karting Indoor Provence|1985 chemin de la Vallée|6|43.28|5.55", "13|Istres|La Pyramide|ZAC des Salles|12|43.51|4.99", "13|Les Pennes-Mirabeau|Bowlingstar Plan de Campagne|Chemin des Pennes au Pin|36|43.41|5.34", "13|Marseille|Valentine|12 route de la Sablière|28|43.29|5.49", "13|Martigues||ZAC de Figuerolles|16|43.41|5.05", "13|Salon-de-Provence|Bowlingstar|Place Jules Morgan|12|43.64|5.10", "13|Vitrolles||19 boulevard de l'Europe|8|43.45|5.25", "14|Mondeville|Bowling du Calvados|6 rue Charles Coulomb|22|49.17|-0.31", "14|Courseulles-sur-Mer|Bowling de la Mer|Place du 6 Juin|8|49.33|-0.46", "14|Touques||83 rue du Val d'Auge|12|49.36|0.11", "14|Honfleur|La Fosserie|ZA du Plateau|12|49.40|0.24", "14|Lisieux||69 rue de Paris|8|49.14|0.23", "14|Villers-sur-Mer||6-8 rue des Grives|3|49.32|0.00", "14|Vire|Bowling de Vire|Rue de la Petite Vitesse|12|48.84|-0.89", "15|Aurillac||104 avenue du Général Leclerc|8|44.93|2.44", "15|Ytrac|Pitchoun Lounge|ZAC du Puy d'Esban|8|44.90|2.40", "16|Angoulême||528 route de Bordeaux|16|45.62|0.14", "16|Châteaubernard|Cognac Bowling|1 rue du Commerce|12|45.68|-0.33", "17|La Rochelle||Port des Minimes, ZAC Minimes|18|46.14|-1.17", "17|Saintes||Rue des Rochers|10|45.75|-0.63", "17|Meschers-sur-Gironde|Family Fun Bowling|49 route de Semussac|12|45.56|-0.95", "17|Dolus-d'Oléron|L'Abordage|Zone commerciale de la Jarrie|8|45.91|-1.26", "18|Bourges|Bowling du Prado|Rue Pré Doulet|15|47.09|2.40", "18|Saint-Doulchard|Espace Bowling|Le Briou, route d'Orléans|16|47.10|2.35", "18|Vierzon|L'Enjoy Bowling|Rue de la Société Française|16|47.22|2.07", "19|Brive-la-Gaillarde|Bowling Briviste|6 avenue Léo Lagrange|10|45.16|1.53", "2A|Ajaccio|Santa Lina|Route des Sanguinaires|6|41.92|8.70", "2A|Lecci|Corsica Game|Mulinaccio|6|41.66|9.35", "2B|Furiani||Lenza Lugha, RN 193|10|42.66|9.43", "21|Beaune||4 rue Buffon, ZAC de la Porte de Beaune|12|47.04|4.84", "21|Dijon|Euro Bowling|19 rue Marguerite Yourcenar|20|47.31|5.07", "21|Marsannay-la-Côte|Marsannay la Côte|806 rue de la Pièce Cornue|26|47.27|5.00", "22|Taden|Le Bélem|8 rue de la Tramontane, zone des Alleux|10|48.46|-2.03", "22|Lannion|L'Éclipse|ZC Le Lion, rond-point Saint-Marc|10|48.74|-3.45", "22|Perros-Guirec|Les Haubans|41 rue de Pleumeur|10|48.81|-3.44", "22|Saint-Brieuc|Le Cyclope|14 rue de Paris|8|48.51|-2.76", "22|Trégueux||3 rue Louis Malle, espace loisirs Brézillet|20|48.48|-2.74", "24|Saint-Laurent-des-Vignes||Route de Bordeaux|10|44.84|0.52", "24|Trélissac|Snook-Bowl Palace|ZC la Feuilleraie|10|45.19|0.77", "24|Sarlat|Bowling Losmoz|Lieu-dit Prends-Garde|8|44.90|1.22", "25|Besançon||4 route de Marchaux|24|47.26|6.04", "25|Besançon|Ducky Bowling (Châteaufarine)|ZAC de Châteaufarine, rue G. Apollinaire|12|47.25|5.98", "25|Audincourt|Bowling 25 (Forges)|ZA les Forges, 17 rue Four Martin|10|47.49|6.84", "25|Audincourt|Star Bowl (Espace Lumière)|Rue de la Naille|16|47.48|6.85", "25|Les Fins||Rue du Calvaire|10|47.06|6.62", "25|Pontarlier||1 rue Hélène Boucher, ZA des Grands Planchants|8|46.91|6.34", "26|Saint-Paul-Trois-Châteaux|Saint-Paul 2003 (B Best)|Centre sportif Les Migesolles|12|44.35|4.77", "26|Valence||Chemin de l'Epervière|12|44.92|4.90", "27|Évreux|Le Parvis Bowling|2 rue Franklin Roosevelt|10|49.02|1.15", "27|Louviers|Le Kolisé|23 avenue François Mitterrand|8|49.22|1.17", "28|Barjouville|Xbowl|17 rue Pierre Missigault, ZA|16|48.43|1.46", "28|Nogent-le-Phaye|Bowling de Chartres|8 route de Gasville, ZA du Bois-Paris|12|48.46|1.57", "28|Nogent-le-Rotrou|Aquaval|Rue Saint-Hilaire|8|48.32|0.82", "29|Brest|Le Master|Avenue Georges Pompidou|16|48.41|-4.46", "29|Carhaix-Plouguer|Strikart|Dépendances de Pervisiens|10|48.27|-3.57", "29|Quimper|Le Master|59 rue du Président Sadate|12|47.99|-4.09", "29|Mellac|Keringant Kervidanou||10|47.87|-3.58", "29|Saint-Martin-des-Champs|Le Corsaire|Parc d'activités du Launay|12|48.60|-3.84", "30|Alès|Bowling des Cévennes|Rocade Sud, 1639 chemin des Sports|10|44.12|4.08", "30|Caissargues|Zone Euro 2000|Chemin de Grande Terre|16|43.81|4.37", "30|Nîmes|Space Bowling|ZA Mas des Abeilles, 130 rue Michel Debré|20|43.80|4.31", "31|Toulouse|Bowling de Labège|1 impasse Louise Labé, route de Labège|28|43.56|1.48", "31|Toulouse|Centre commercial Gramont|Chemin de Gabardie, RN 12|26|43.64|1.48", "31|Toulouse|Bowling des Minimes|108 bis avenue des Minimes|14|43.63|1.43", "32|Auch|Bowling d'Auch|134 rue Victor Hugo|10|43.65|0.59", "33|Gujan-Mestras|Bowling Star|Lotissement Bâton Rouge|16|44.64|-1.07", "33|Bègles|Bowling des Rives d'Arcins|Chemin de Courréjean|24|44.79|-0.55", "33|Bordeaux||Place Général Koenig|16|44.83|-0.57", "33|Bordeaux|Kart System (Lac)|2 rue du Grand Barrail|20|44.89|-0.57", "33|Libourne||23 avenue Henri Brulle|6|44.92|-0.24", "33|Mérignac||244 avenue de la Marne|24|44.84|-0.65", "34|Sauvian||Route de Béziers|8|43.30|3.26", "34|Villeneuve-lès-Béziers|Xtreme Bowling|ZAC de la Montagnette, Cap Floride|8|43.32|3.28", "34|Montpellier||662 avenue de la Pompignane|16|43.62|3.90", "34|Montpellier|Odysseum|ZAC Odysseum, 20 place de Venise|40|43.60|3.92", "35|Dol-de-Bretagne||Rue de la Rouelle, ZA les Rolandières|12|48.55|-1.75", "35|Fougères||Rue du Dr Bertin, Forum de la Gare|10|48.35|-1.20", "35|Rennes|Alma Loisir|2 rue du Bosphore|16|48.12|-1.62", "35|La Mézière|Bowl Center Cap Malo|Cap Malo|24|48.22|-1.74", "35|Vitré|Le Skittle|1 rue Alessandro Volta|8|48.12|-1.21", "36|Châteauroux|Cyber Bowling|13 avenue Parc des Loisirs, Belle-Isle|12|46.80|1.69", "36|Issoudun|Centre sportif municipal||6|46.95|2.00", "37|Tours|SilverBowl Tours|28 avenue Marcel Mérieux|20|47.40|0.70", "38|Chatte||RN 92, la Gloriette|4|45.12|5.28", "38|Les Deux Alpes||Place de Venosc|6|45.01|6.12", "38|Les Deux Alpes|La Meije|20 hameau La Meije|8|45.01|6.12", "38|Échirolles|Bowl Center|19 avenue de Grugliasco|32|45.15|5.72", "38|Estrablin||Carrefour de l'Abbaye|8|45.53|4.97", "38|Villard-de-Lans||101 chemin de la Patinoire|4|45.07|5.55", "39|Brevans||ZA Grande Coube|7|47.07|5.46", "39|Prémanon|Le Bowling|146 rue Croix de la Teppe|12|46.49|6.00", "39|La Chaumusse|Sitting Bowl|5 route des Curtillats|6|46.58|5.92", "40|Saint-Paul-lès-Dax|Casino César Palace||8|43.73|-1.07", "40|Capbreton|Bowling du Port|Rue Maurice Martin, ZAC de la Pêcherie|8|43.64|-1.43", "41|Blois||25 rue Robert Nau|20|47.59|1.33", "42|Savigneux|Forez Bowling|La Bruyère|10|45.62|4.06", "42|Riorges|Bowling Espace Loisir|578 avenue du Général de Gaulle|12|46.04|4.04", "42|Saint-Étienne|Le Flore|31 boulevard Jules Janin|12|45.43|4.39", "42|Villars|Inside Park|85 chemin de la Côte|18|45.49|4.35", "43|Saint-Christophe-sur-Dolaizon|L'Odyssée|ZA la Clé des Champs|10|45.02|3.85", "43|Yssingeaux|Planète Bowling|ZA de la Guide|8|45.14|4.12", "44|Carquefou|Bowling de l'Erdre|La Charmelière|10|47.30|-1.49", "44|Châteaubriant||Place Ernest Bréant|6|47.72|-1.37", "44|Guérande|Presqu'île Bowling|Avenue Gustave Flaubert, ZAC Kerbiniou|14|47.33|-2.43", "44|Nantes||Boulevard du Petit Port|16|47.24|-1.55", "44|Saint-Géréon||Boulevard de la Prairie|12|47.40|-1.27", "44|Saint-Herblain|Bowl Center Atlantis|Rue du Moulin de la Rousselière|32|47.22|-1.63", "44|Saint-Nazaire||ZAC Océanis, allée de la Mer d'Iroise|16|47.27|-2.20", "44|Saint-Sébastien-sur-Loire|EuroBowl|27 rue Marie Curie, ZAC des Gripots|26|47.20|-1.50", "45|Amilly|Bowling d'Anilly|335 rue Vernisson, ZAC Sud|16|48.00|2.76", "45|Orléans||2 rue Moreau|20|47.90|1.91", "45|Saran|Le Complex|1 rue de la Tuilerie|24|47.95|1.88", "46|Cahors|Bowling Cadurcien|Belle-Croix, route de Toulouse|8|44.43|1.43", "47|Boé||Route d'Auch, ZAC Rigoulet|8|44.19|0.62", "47|Allez-et-Cazeneuve|Bowling du Sud-Ouest|Laplagne|8|44.39|0.68", "49|Angers|Colibowl|8 bis boulevard Maréchal Foch|10|47.47|-0.55", "49|Beaucouzé|Silver Bowl|ZA du Landreau|24|47.47|-0.63", "49|Cholet|Bowling du Stadium|34 rue d'Anjou|14|47.06|-0.88", "49|Sainte-Gemmes-sur-Loire|Red Bowl|ZAC de Ver-nusson|12|47.41|-0.57", "49|Saumur||52-56 route de Rouen|6|47.26|-0.07", "50|Cherbourg||Port Chantereyne|12|49.64|-1.62", "50|Saint-Pierre-de-Coutances|Le Yéti|2 rue des Carrières Saint-Michel|8|49.05|-1.44", "50|Donville-les-Bains|L'Hermitage|Rue de la Plage|6|48.85|-1.57", "50|Saint-Lô|Le Macao|Centre commercial, rue Octave Feuillet|6|49.12|-1.09", "50|Marcey-les-Grèves||31 rue Le Pavé|8|48.70|-1.35", "51|Châlons-en-Champagne||Rue Michel Ménard, ZA Escarnotières|24|48.95|4.37", "51|Épernay||30 rue Marcel Paul|12|49.04|3.96", "51|Tinqueux||ZAC Moulin de l'Écaille, 16 rue N. Appert|34|49.25|3.99", "51|Taissy||6 rue Édouard Branly|8|49.20|4.08", "51|Thillois|Vegas Bowling|Parc Millésime, ZAC de Thillois|22|49.23|3.98", "52|Chaumont|Le Strike 20|Route de Neuilly|12|48.11|5.14", "53|Laval|Cap Form|64 rue Henri Bastard|16|48.07|-0.77", "54|Nancy|Magic Bowling|ZAC Meurthe et Canal, 16 rue Georges de la Tour|24|48.69|6.21", "54|Longwy||Avenue de Saintignon|8|49.52|5.76", "54|Pont-à-Mousson||609 rue du Bois le Prêtre|8|48.91|6.05", "54|Vandœuvre-lès-Nancy||Centre commercial Les Nations|16|48.66|6.17", "56|Saint-Avé|SuperBowl|1 rue M. Dassault, ZA Kermelin Toulbaou|14|47.69|-2.73", "56|Locminé||ZA de Kerjean|6|47.90|-2.83", "56|Larmor-Plage||3 rue du Minio|12|47.72|-3.38", "56|Ploërmel|Bowling du Lac|Zone du Lac|12|47.93|-2.40", "56|Noyal-Pontivy||ZA du Goheleve|12|48.07|-2.97", "56|Vannes|Le Master|Parc du Golfe, 7 rue Gilles Gahinet|12|47.64|-2.77", "57|Amnéville|Centre thermal et touristique|Rue des Thermes|16|49.26|6.14", "57|Saint-Julien-lès-Metz|Bowl Factory|14 avenue Paul Langevin|20|49.13|6.21", "57|Augny|Étoile Loisirs|ZAC d'Augny|16|49.06|6.12", "57|Phalsbourg|Le Bowling des 4 Vents|ZA Maison Rouge, rue de l'Europe|18|48.77|7.26", "57|Saint-Avold|Starbowl|ZI du Gros Chêne, 94 rue du Général Altmayer|16|49.10|6.71", "58|Marzy|Euro Bowling / Bowling du Triangle|ZAC de Marzy|10|47.00|3.19", "58|Cosne-sur-Loire|Golden Strike|22 rue du Maréchal Leclerc|6|47.41|2.93", "59|Proville||Rue des Aubépines|2|50.16|3.21", "59|Condé-sur-l'Escaut||Complexe Ludi|8|50.45|3.59", "59|Douai|Le Vauban|193 boulevard Bréguet|16|50.37|3.08", "59|Dunkerque||Sentier de la Vallée|10|51.03|2.38", "59|Gravelines|Sportica|Place du Polder|8|50.99|2.12", "59|Hazebrouck||Avenue de Saint-Omer|14|50.72|2.55", "59|Lille|Metro Bowling|17-25 boulevard Victor Hugo|36|50.63|3.07", "59|Lomme|Planet Bowling|ZA du Grand But|40|50.65|2.99", "59|Ronchin|Family Bowling|Champ du Cerf, rue Vincent Auriol|8|50.60|3.10", "59|Roubaix|Le Cosmos|20-22 rue du Grand Chemin|16|50.69|3.18", "59|Valenciennes|Satellium|20 rue des Vosges|24|50.36|3.52", "59|Villeneuve-d'Ascq|Bowling Van Gogh|1 rue des Vétérans|24|50.62|3.15", "60|Jaux|Karting Bowling|Place Jacques Tati|24|49.40|2.88", "60|Saint-Maximin|Plaza Bowling|ZAC du Bois des Fenêtres|28|49.22|2.45", "61|Argentan||2 rue Tramway|8|48.74|-0.02", "61|Flers||Allée des Éclosets|12|48.75|-0.57", "61|L'Aigle||Avenue Kennedy|6|48.76|0.63", "62|Berck|Complexe nautique L'Agora|Avenue Parmentier|8|50.40|1.57", "62|Béthune|Centre de loisirs|66 avenue P. de Coubertin|8|50.52|2.64", "62|Boulogne-sur-Mer||6 impasse Quéhen|10|50.72|1.61", "62|Bruay-la-Buissière|CD Bowling|Rue des Frères Lumière, ZAC de la Porte Nord|18|50.49|2.55", "62|Calais|Centre de loisirs|Avenue Saint-Exupéry|8|50.95|1.86", "62|Coquelles|Quai 121|Centre commercial Europe|22|50.93|1.81", "62|Hénin-Beaumont|Karting Bowling|ZAC du Bord des Eaux|32|50.42|2.95", "62|Saint-Martin-lez-Tatinghem||Route de Calais|6|50.76|2.24", "63|Clermont-Ferrand||88 avenue du Brézet|34|45.79|3.13", "63|Clermont-Ferrand|Le B.Bowl Center|22 rue de l'Éminée|30|45.79|3.15", "63|Issoire||Rue Jean Monnet|8|45.54|3.25", "63|Le Mont-Dore|Centre sportif municipal||6|45.57|2.81", "64|Bayonne||ZI les Pontots|20|43.50|-1.46", "64|Anglet||1 allée du Cadran, RN 10|16|43.48|-1.50", "64|Lescar|Free Bowl|180 boulevard de l'Europe|16|43.33|-0.43", "64|Pau|Bowling des Pyrénées|222 avenue Jean Mermoz|12|43.32|-0.36", "65|Bordères-sur-l'Échez|Bowling Agora|21 route de Bordeaux|10|43.21|0.10", "66|Argelès-sur-Mer|Plaza Bowl|ZAC les Honors, route du Littoral|12|42.55|3.03", "66|Bolquère|Bowling l'Élan|4 bis avenue du Serrat de l'Ours|10|42.50|2.00", "66|Les Angles||92 avenue Mont-Louis|4|42.57|2.07", "66|Perpignan|X'Treme Bowling|Les Palmiers, ZAC du Mas Balande|16|42.72|2.88", "67|Strasbourg||Jardin de l'Orangerie|24|48.59|7.77", "67|Wisches||Route du Moulin|4|48.50|7.25", "68|Colmar||1 rue André Kiener|16|48.08|7.38", "68|Mulhouse||3 rue de Metz|16|47.75|7.34", "68|Wittelsheim|Cristal Bowling|Zone A Heiden, 6 rue des Pays-Bas|36|47.80|7.24", "69|Brignais|Bowling de l'Ouest Lyonnais|Rue de l'Industrie|14|45.67|4.75", "69|Genas|Genas Bowling|1 chemin des Mûriers, ZAC|10|45.73|4.72", "69|Lyon 8e|Bowling du 8ème|80 boulevard Marius Berliet|14|45.74|4.88", "69|Lyon 3e|La Part-Dieu|30 boulevard Eugène Deruelle|20|45.76|4.86", "69|Saint-Laurent-de-Chamousset||Escapade Le Pontet|6|45.74|4.46", "69|Villefranche-sur-Saône||1051 boulevard Burdeau|10|45.99|4.73", "70|Pusey|Le Strike|ZA de l'Oasis|8|47.63|6.13", "71|Autun||Route de Chalon, face au lac|8|46.95|4.31", "71|Mâcon||105 allée Jean Bouin|14|46.30|4.83", "71|Montchanin|Bowling du Vieux Saule|Rond-point de Torcy|8|46.76|4.45", "72|Le Mans||56-58 boulevard Nicolas Cugnot|26|48.00|0.20", "72|La Flèche|Le Laser Bowl|ZAC de La Monnerie, allée des Gabares|8|47.70|-0.07", "72|Solesmes||Rue de la Denisière|6|47.84|-0.30", "72|Arçonnay||18 route du Mans|12|48.45|0.12", "73|Albertville|Bowling 3000|115 chemin du Pont d'Albertin|6|45.67|6.39", "73|Voglans|IBowling|Rue Françon|18|45.62|5.88", "73|Courchevel|Bowling International Courchevel 1850||8|45.41|6.63", "73|Lanslevillard|Bowling des 1480|Les Glières|6|45.29|6.90", "73|La Plagne|Bowling||4|45.51|6.68", "73|Montvalezan|Bowling Les Euchers / La Rosière||6|45.63|6.85", "73|Les Arcs 2000|Le Vaset||6|45.57|6.82", "73|Bourg-Saint-Maurice|Les Arcs 1800||8|45.62|6.77", "73|Les Chavannes-en-Maurienne|L'Aiguillon||8|45.31|6.33", "73|Méribel|Centre sportif La Chaudane||6|45.40|6.57", "73|Tignes|Bowling Center|Chalet Aubry|12|45.47|6.91", "73|La Toussuire||Les Plans|6|45.25|6.26", "73|Valloire||Base de loisirs|6|45.17|6.43", "73|Valmeinier|Bow Ski, espace culturel||4|45.20|6.48", "73|Val Thorens|KJP Loisir|Place de l'Arche|10|45.30|6.58", "74|Annecy|Annecy Bowling Club|9 bis boulevard du Fier|16|45.90|6.12", "74|Annemasse|Bowling de l'Aérodrome|1 rue de l'Industrie|12|46.19|6.24", "74|Avoriaz|Le Studio||2|46.19|6.77", "74|Chamonix||Avenue de Courmayeur|8|45.92|6.87", "74|Châtel||Le Vieux Four|4|46.27|6.84", "74|Flaine|Castel Bowling|Galerie marchande|6|46.00|6.69", "74|Les Gets||Le Chouca|2|46.16|6.67", "74|Demi-Quartier (Megève)||Route de Sallanches|8|45.86|6.62", "74|Morzine|Capitale II||3|46.18|6.71", "74|Sallanches|Le Laser Game|531-533 rue du Capitaine Bulle|10|45.94|6.63", "74|Sévrier||3563 route d'Albertville|12|45.86|6.14", "74|Margencel|Margencel Loisirs|Lieu-dit Les Cys, 560 route du Crêt Gojon|20|46.33|6.40", "75|Paris 5e|Mouffetard|13 rue Gracieuse|8|48.84|2.35", "75|Paris 14e|Montparnasse|25 rue du Commandant René Mouchotte|16|48.84|2.32", "75|Paris 15e|Front de Seine|11-21 rue Gaston de Caillavet|20|48.85|2.28", "75|Paris 16e|Étoile Foch|8 avenue Foch|16|48.87|2.29", "75|Paris 17e|Champerret|2 rue du Caporal Peugeot|18|48.89|2.29", "75|Paris 18e|La Chapelle|6 avenue de la Porte de la Chapelle|24|48.90|2.36", "76|Amfreville-la-Mivoie|BBA|177 route de Paris|8|49.43|1.14", "76|Dieppe||Centre commercial du Belvédère|8|49.92|1.08", "76|Le Grand-Quevilly|Le Bois Cany|22 boulevard Pierre Brossolette|28|49.41|1.04", "76|Le Havre||47 rue François Mazeline|12|49.49|0.12", "76|Montivilliers|Le Looping|6 rue des Hérons|18|49.55|0.19", "76|Notre-Dame-de-Gravenchon||3 rue Jean Maridor|4|49.50|0.57", "76|Rouen||130 rue de Constantine|16|49.44|1.09", "77|Brie-Comte-Robert|L'Univers|10 rue Léonard de Vinci, ZA la Haie Passart|12|48.69|2.61", "77|Chelles||74 rue Auguste Meunier|12|48.88|2.60", "77|Coulommiers|L'Uzine|6 rue des Margrats|16|48.81|3.09", "77|Lieusaint|Star Bowling|Carré Sénart, 18-20 allée du Trait d'Union|32|48.63|2.55", "77|Moussy-le-Neuf|Escape Factory|8 avenue des 22 Arpents|20|49.00|2.65", "77|Poincy||Rue de la Briquetière, ZI Entrepôt Piot|8|48.97|2.85", "77|Ozoir-la-Ferrière|Le City Bowling|1 rue de la Ferme du Presbytère|20|48.76|2.67", "77|Provins||9 rue Georges Dromigny|8|48.56|3.30", "77|Souppes-sur-Loing|Les Varennes|Rue du Lavoir|12|48.18|2.73", "78|Coignières|Le Krypton|20 chemin rural, centre commercial des Borderies|10|48.75|1.92", "78|Conflans-Sainte-Honorine|Speedpark|ZA des Boutries, 18 rue de l'Hautil|40|49.00|2.09", "78|Houdan|Bowling Star Houdan|Route de Bû|12|48.79|1.60", "78|Mantes-la-Ville||71 rue Marcel Sembat|8|48.99|1.70", "78|Maurepas||3 avenue Louis Pasteur|20|48.77|1.95", "78|Montigny-le-Bretonneux||1 avenue de la Source de la Bièvre|18|48.77|2.03", "78|Orgeval|BowlCenter|Centre commercial d'Orgeval, 2050 route de Quarante Sous|30|48.93|1.99", "78|Rambouillet||ZAC du Bel Air, 1 rue Hippolyte Mège-Mouriès|18|48.64|1.83", "79|Bressuire|Bocabowl|Bocapole|12|46.84|-0.49", "80|Abbeville||Rue Macqueron, parc d'activité des 2 Vallées|8|50.11|1.83", "80|Albert||Avenue Faidherbe|6|50.00|2.65", "80|Camon|Bowling de Picardie|Route de Corbie|18|49.88|2.35", "80|Mers-les-Bains||Rond-point de Froideville|14|50.07|1.40", "81|Albi||Le Séquestre, chemin des Taillades|8|43.91|2.15", "81|Castres|Le Stadium|Cours l'Espinassette, Les Salvages|8|43.62|2.24", "82|Montauban||RN 20, route de Paris|14|44.03|1.37", "83|Bandol||Route du Beausset, ZI la Repe|16|43.14|5.76", "83|Draguignan|Bowling 2000|Centre commercial Saint-Léger|8|43.54|6.47", "83|Fréjus||2 route de Bagnols, Lou Gabian|8|43.45|6.74", "83|Grimaud||RN 98, Saint-Pons-les-Mûres|8|43.28|6.55", "83|La Garde|Bowling de Provence|563 chemin des Plantades|28|43.13|6.01", "84|Avignon|Bowling Promotion|1 avenue Paul Claudel|16|43.93|4.81", "84|Le Pontet|Bowling du Pontet|Chemin des Petits Rougiers|22|43.96|4.86", "85|Challans|Bowling Cosmos|3 rue Marcel Pagnol, route de Nantes|8|46.85|-1.88", "85|La Roche-sur-Yon|Bowling du Parc|Boulevard Don Quichotte, ZAC les Oudairies|14|46.69|-1.43", "85|Les Sables-d'Olonne|Le Régency|10 boulevard du Souvenir Français, Port Olona|10|46.50|-1.78", "86|Buxerolles|EuroBowl|Rue des Frères Lumière|22|46.61|0.37", "86|Civaux|Abyssea|Route du Fond d'Orveau|8|46.45|0.65", "86|Poitiers|Bowling de Beaulieu|2 avenue Lafayette|10|46.58|0.36", "87|Feytiat|Bowling Club Limousin|Route de Toulouse|20|45.82|1.33", "87|Chaillac-sur-Vienne|L'Éclipse||10|45.87|0.95", "88|Contrexéville|Happy Bowling|745 avenue des Pierrottes|12|48.18|5.90", "88|Épinal||4 rue de la Côte Cabiche|12|48.18|6.45", "88|Gérardmer|Bowling Bar Quai du Locle|7 rue des Pêcheurs|6|48.07|6.88", "88|Saint-Dié-des-Vosges||Rue du 11 novembre 1918|4|48.28|6.95", "89|Monéteau|Aux 2B|ZA de Macherin|20|47.85|3.58", "89|Saint-Clément|Cap Loisir 89|2 rue de la Gaillarde|8|48.20|3.30", "90|Belfort|Bowling des 4 As|Centre commercial des 4 As|16|47.64|6.84", "91|Boussy-Saint-Antoine||Centre commercial Val d'Yerres 2|12|48.69|2.54", "91|La Norville|Le Stadium|22 allée de la Mare Jacob|16|48.59|2.27", "92|Courbevoie|Centre Olympique Charras|15 rue Auguste Beau|12|48.90|2.25", "93|Épinay-sur-Seine|Le Canyon|8 rue Henri Wallon|8|48.95|2.31", "94|Fontenay-sous-Bois||La Matène, 12 rue de la Matène|16|48.85|2.48", "94|Joinville-le-Pont|BG Maxe|162 allée des Guinguettes|16|48.82|2.47", "94|Nogent-sur-Marne|BG M. Chevalier|Square Tino Rossi|12|48.84|2.47", "94|Thiais|Belle Épine|3 rue des Alouettes|32|48.76|2.37", "95|Cergy||Centre commercial Les 3 Fontaines|12|49.04|2.05", "95|Franconville||25 avenue des Marais|12|49.00|2.23", "95|Saint-Gratien|Le Stadium|23 avenue Berthie Albrecht|16|48.97|2.28", "971|Baie-Mahault||Z.I. de Jarry|6|16.26|-61.59", "973|Rémire-Montjoly|Hôtel Beauregard||6|4.89|-52.27", "974|Saint-Denis (La Réunion)||Boulevard Vauban|12|-20.88|55.45"];
 const BALLS_RAW=[["Storm", "Phaze II"], ["Storm", "Phaze AI"], ["Storm", "Phaze 3"], ["Storm", "Hy-Road"], ["Storm", "Hy-Road Pearl"], ["Storm", "IQ Tour"], ["Storm", "Pitch Black"], ["Storm", "Tropical Breeze"], ["Storm", "Match Up"], ["Storm", "Equinox"], ["Storm", "EquinoX Solid"], ["Storm", "Mix"], ["Storm", "Next Factor"], ["Storm", "Virtual Energy Blackout"], ["Storm", "Bionic"], ["Hammer", "Black Widow"], ["Hammer", "Black Widow 2.0"], ["Hammer", "Black Widow 2.0 Hybrid"], ["Hammer", "Black Widow 3.0"], ["Hammer", "Black Widow Mania"], ["Hammer", "Effect"], ["Hammer", "Zero Mercy Pearl"], ["Hammer", "Purple Pearl Urethane"], ["Hammer", "Blacklist"], ["Roto Grip", "Hustle"], ["Roto Grip", "Hustle VP"], ["Roto Grip", "Hustle SOS"], ["Roto Grip", "Attention Star"], ["Roto Grip", "Gremlin"], ["Roto Grip", "Wicked Gremlin"], ["Roto Grip", "Transformer"], ["Roto Grip", "RST Hyperdrive Pearl"], ["Roto Grip", "Idol"], ["900 Global", "Zen"], ["900 Global", "Zen 25"], ["900 Global", "Vengeance"], ["900 Global", "Eternity Pi"], ["900 Global", "Viking Conquest"], ["900 Global", "Honey Badger"], ["Motiv", "Jackal"], ["Motiv", "Jackal Ghost"], ["Motiv", "Apex Jackal"], ["Motiv", "Jackal Ghost V2"], ["Motiv", "Primal Ghost"], ["Motiv", "Primal Rage"], ["Motiv", "Steel Forge"], ["Motiv", "Evoke Mayhem"], ["Motiv", "Venom Shock"], ["Brunswick", "Rhino"], ["Brunswick", "Quantum"], ["Brunswick", "Quantum Bias"], ["Brunswick", "T-Zone"], ["Brunswick", "Slingshot"], ["Brunswick", "Crown 78U"], ["Brunswick", "Crown Victory Pearl"], ["Brunswick", "Combat Solid"], ["Ebonite", "Maxim"], ["Ebonite", "Game Breaker"], ["Ebonite", "Real Time"], ["Ebonite", "The Great One"], ["Ebonite", "The One"], ["DV8", "Smooth Criminal"], ["DV8", "Intense Collision"], ["Radical", "Evil Eye Pearl"], ["SWAG", "Black Dragon Pearl"], ["SWAG", "Judgement Hybrid"], ["Columbia 300", "White Dot"], ["", "Boule du bowling (prêtée)"], ["", "Boule plastique (spare)"]];
 const FR_OUT=[[51.09, 2.55], [51.03, 2.37], [50.95, 1.86], [50.87, 1.58], [50.73, 1.6], [50.52, 1.58], [50.22, 1.57], [50.06, 1.37], [49.93, 1.08], [49.76, 0.37], [49.69, 0.16], [49.48, 0.1], [49.42, 0.23], [49.36, 0.07], [49.28, -0.25], [49.34, -0.62], [49.38, -1.02], [49.67, -1.26], [49.72, -1.95], [49.37, -1.8], [48.84, -1.6], [48.64, -1.51], [48.68, -1.85], [48.65, -2.03], [48.69, -2.32], [48.55, -2.72], [48.83, -3.0], [48.82, -3.45], [48.73, -3.98], [48.6, -4.77], [48.33, -4.77], [48.04, -4.74], [47.8, -4.37], [47.87, -3.92], [47.73, -3.37], [47.48, -3.12], [47.55, -2.77], [47.38, -2.55], [47.27, -2.2], [47.11, -2.1], [46.99, -2.25], [46.69, -1.95], [46.49, -1.79], [46.15, -1.17], [45.95, -1.4], [45.62, -1.03], [45.57, -1.07], [45.0, -1.2], [44.66, -1.17], [44.4, -1.25], [44.2, -1.29], [43.65, -1.45], [43.48, -1.56], [43.37, -1.79], [43.28, -1.6], [43.16, -1.24], [43.0, -0.73], [42.9, -0.45], [42.78, -0.2], [42.69, 0.0], [42.72, 0.2], [42.85, 0.65], [42.85, 1.0], [42.8, 1.35], [42.5, 1.45], [42.45, 1.7], [42.45, 2.0], [42.43, 2.7], [42.43, 3.17], [42.55, 3.03], [42.72, 3.04], [42.92, 3.05], [43.1, 3.15], [43.28, 3.5], [43.4, 3.7], [43.55, 4.15], [43.45, 4.43], [43.4, 4.85], [43.3, 5.35], [43.21, 5.54], [43.17, 5.6], [43.1, 5.93], [43.08, 6.15], [43.22, 6.65], [43.42, 6.74], [43.55, 7.02], [43.7, 7.27], [43.79, 7.5], [44.08, 7.68], [44.2, 7.35], [44.3, 6.9], [44.65, 6.95], [44.93, 6.72], [45.1, 7.05], [45.3, 7.05], [45.5, 7.15], [45.83, 6.86], [46.05, 6.9], [46.39, 6.81], [46.25, 6.15], [46.45, 6.1], [46.62, 6.2], [46.7, 6.37], [46.9, 6.35], [47.07, 6.6], [47.25, 6.8], [47.22, 6.98], [47.5, 7.0], [47.58, 7.59], [47.8, 7.6], [48.0, 7.58], [48.3, 7.72], [48.58, 7.8], [48.97, 8.2], [49.04, 7.95], [49.05, 7.6], [49.12, 7.2], [49.2, 6.95], [49.3, 6.78], [49.43, 6.35], [49.48, 6.15], [49.53, 5.9], [49.53, 5.76], [49.52, 5.4], [49.7, 5.2], [49.75, 4.85], [50.14, 4.82], [50.2, 4.2], [50.28, 4.0], [50.35, 3.7], [50.55, 3.3], [50.7, 3.15], [50.68, 2.88], [50.8, 2.6]],COR_OUT=[[43.0, 9.4], [42.8, 9.45], [42.55, 9.53], [42.2, 9.56], [41.9, 9.4], [41.6, 9.35], [41.38, 9.16], [41.55, 8.9], [41.75, 8.8], [41.92, 8.62], [42.2, 8.6], [42.4, 8.55], [42.57, 8.72], [42.7, 8.85], [42.8, 9.3]];
 
@@ -1417,9 +1592,11 @@ function spareHelper(stand){
 function viewGame(){
   if(ui.demo)return demoBar()+'<div class="card"><h2>Compte démo en lecture seule</h2><p class="small mute">Explore les stats, les lancers et le coach avec ces données d’exemple. Quitte la démo pour saisir tes vraies parties.</p><button class="btn primary block" data-act="demo-off">Quitter le compte démo</button></div>';
   const c=state.current,r=c.r,ns=nextState(r),sc=score(r);
-  let h=modeBar()+ctxCard()+((!ns.done&&(r.length||curBall()))?chgCard():'')+boardHTML(r,ns.done?-1:ns.frame,c.l);
+  let h=modeBar()+ctxCard()+((!ns.done&&(r.length||curBall()))?chgCard():'')+boardHTML(r,ns.done?-1:ns.frame,c.l,'cur');
   h+='<div class="total"><span class="mute">'+(ns.done?'Partie terminée':'Frame '+(ns.frame+1)+' · boule '+(ns.ball+1)+(ns.standing<10?' · '+ns.standing+' debout':''))+'</span><b>'+sc.total+'</b></div>';
 
+  if(ui.fe&&ui.fe.k==='cur')return h+feCard();
+  if(r.length&&(ns.done||ns.frame>0))h+='<div class="small mute" style="margin:6px 2px 0">Une erreur ? Touche la frame à corriger.</div>';
   if(ns.done){
     h+='<div class="card"><h2>Partie terminée : '+sc.total+'</h2><div class="row2"><button class="btn primary" data-act="save">Enregistrer</button><button class="btn" data-act="undo">Corriger</button></div></div>';
   }else{
@@ -1561,7 +1738,7 @@ async function getSample(){
 const PIN_OFF={1:0,2:-6,3:6,4:-12,5:0,6:12,7:-18,8:-6,9:6,10:18};
 const PIN_ROW={1:0,2:1,3:1,4:2,5:2,6:2,7:3,8:3,9:3,10:3};
 const PIN_MIR={1:1,2:3,3:2,4:6,5:5,6:4,7:10,8:9,9:8,10:7};
-const SP_A={10:35,6:32,3:29,9:29,7:15,4:18,2:21,8:21,1:20,5:20};   /* départs boule droite (planche, côté droitier) */
+const SP_A={10:35,6:32,3:29,9:29,7:15,4:18,2:21,8:21,1:20,5:20};   /* départs boule droite (latte, côté droitier) */
 const SP_B={1:0,5:0,2:-3,8:-3,4:-6,7:-9,3:3,9:3,6:6,10:9};           /* décalage 3-6-9 (négatif = vers la droite du droitier) */
 ui.ct='learn';ui.ln={sec:'bases',pins:[],sys:'b',adj:null};
 function lnS(){return state.settings.learn||(state.settings.learn={len:40});}
@@ -1581,7 +1758,7 @@ function spline(P){
   }
   return d;
 }
-/* o: {alt, oil:len, lines:[{pts:[[planche,ft]..],cls:'main|ghost',smooth}], marks:[{b,ft,t,c,dy,dx}], hi:[pins], pocket:bool, nums:bool} */
+/* o: {alt, oil:len, lines:[{pts:[[latte,ft]..],cls:'main|ghost',smooth}], marks:[{b,ft,t,c,dy,dx}], hi:[pins], pocket:bool, nums:bool} */
 function laneSVG(o){
   const G=handG(),BW=3.5/39,F=1024,HF=4700,D0=14,AL=.35,CX=170,ZM=D0+AL*60+3*2.6,Y0=64-HF/ZM,H=428;
   const zOf=d=>d<60?D0+AL*d:D0+AL*60+(d-60)/0.87*2.6;
@@ -1625,7 +1802,7 @@ function laneSVG(o){
     const dd=P(X,DN+1.3);s+='<circle cx="'+dd[0].toFixed(1)+'" cy="'+dd[1].toFixed(1)+'" r="'+(0.06*dd[2]).toFixed(1)+'" fill="#4a2f0c" opacity=".7"/>';
     if(o.nums!==false){const n=P(bX(b),DN-1.6);s+='<text x="'+n[0].toFixed(1)+'" y="'+(n[1]+2).toFixed(1)+'" font-size="10" font-weight="700" fill="#cfd5db" text-anchor="middle">'+b+'</text>';}
   });
-  if(o.nums!==false)s+='<text x="170" y="'+(H-8)+'" font-size="8.5" fill="#97a1ab" text-anchor="middle">numéro de planche (depuis ta gouttière '+(G?'gauche':'droite')+')</text>';
+  if(o.nums!==false)s+='<text x="170" y="'+(H-8)+'" font-size="8.5" fill="#97a1ab" text-anchor="middle">numéro de latte (depuis ta gouttière '+(G?'gauche':'droite')+')</text>';
   /* poche */
   const hi=o.hi||[];
   if(o.pocket){const c=P(bX(17.5),60),rx=.55*c[2];s+='<ellipse cx="'+c[0].toFixed(1)+'" cy="'+c[1].toFixed(1)+'" rx="'+rx.toFixed(1)+'" ry="'+(rx*.38).toFixed(1)+'" fill="#ffa43a" fill-opacity=".25" stroke="#ffa43a" stroke-width="1.4" stroke-dasharray="3 2"/>';}
@@ -1721,10 +1898,10 @@ function lnDeck(sel){
   const row=a=>'<div>'+a.map(p=>'<button class="dpin'+(sel.includes(p)?' on':'')+'" data-act="ln-pin" data-p="'+p+'">'+p+'</button>').join('')+'</div>';
   return'<div class="deck">'+row([7,8,9,10])+row([4,5,6])+row([2,3])+row([1])+'</div>';
 }
-function boardsWord(d){/* d = décalage en planches (négatif = côté droit du droitier) */
+function boardsWord(d){/* d = décalage en lattes (négatif = côté droit du droitier) */
   const n=Math.abs(d);if(!n)return'aucun décalage';
   const right=handG()?d>0:d<0;
-  return n+' planche'+(n>1?'s':'')+' à '+(right?'droite':'gauche');
+  return n+' latte'+(n>1?'s':'')+' à '+(right?'droite':'gauche');
 }
 function spareCalc(pins){
   const L=lnLine(),mp=pins.map(p=>handG()?PIN_MIR[p]:p);
@@ -1741,25 +1918,25 @@ function lnBases(){
   const G=handG();
   let h='<div class="card"><h2>La piste et tes repères</h2>'
     +laneSVG({alt:'Piste avec repères',pocket:true,hi:G?[1,2]:[1,3],marks:[]})
-    +'<div class="kv" style="margin-top:10px"><b>60 ft</b><span>de la ligne de faute à la quille 1 (18,3 m).</span><b>39 planches</b><span>par piste ; la planche 20 est le milieu.</span><b>Flèches</b><span>7 flèches à 15–16 ft, espacées de 5 planches (planches 5, 10, 15, 20…). On vise une flèche, pas les quilles.</span><b>Points</b><span>Sur l’approche (12 et 15 ft avant la ligne) pour placer tes pieds, et sur la piste (7 ft).</span><b>Poche</b><span>'+(G?'Entre les quilles 1 et 2':'Entre les quilles 1 et 3')+', vers la planche 17–18 à l’arrivée (cercle orange).</span></div>'
-    +'<div class="small mute" style="margin-top:8px">Les planches sont comptées depuis <b>ta</b> gouttière ('+(G?'gauche':'droite')+'). Tu joues du côté '+(G?'gauche':'droit')+' de la piste et tu vises les flèches de ce côté.'+(state.settings.back?' Ton backup tourne à l’inverse d’un hook : la piste se lit comme pour un '+(handR()?'droitier':'gaucher')+' inversé.':'')+'</div></div>';
+    +'<div class="kv" style="margin-top:10px"><b>60 ft</b><span>de la ligne de faute à la quille 1 (18,3 m).</span><b>39 lattes</b><span>par piste ; la latte 20 est le milieu.</span><b>Flèches</b><span>7 flèches à 15–16 ft, espacées de 5 lattes (lattes 5, 10, 15, 20…). On vise une flèche, pas les quilles.</span><b>Points</b><span>Sur l’approche (12 et 15 ft avant la ligne) pour placer tes pieds, et sur la piste (7 ft).</span><b>Poche</b><span>'+(G?'Entre les quilles 1 et 2':'Entre les quilles 1 et 3')+', vers la latte 17–18 à l’arrivée (cercle orange).</span></div>'
+    +'<div class="small mute" style="margin-top:8px">Les lattes sont comptées depuis <b>ta</b> gouttière ('+(G?'gauche':'droite')+'). Tu joues du côté '+(G?'gauche':'droit')+' de la piste et tu vises les flèches de ce côté.'+(state.settings.back?' Ton backup tourne à l’inverse d’un hook : la piste se lit comme pour un '+(handR()?'droitier':'gaucher')+' inversé.':'')+'</div></div>';
   const R=handR();
   h+='<div class="card"><h2>Ta position, pas à pas</h2><ol class="stepl">'
-    +'<li><b>Départ</b>Pied de glisse ('+(R?'droit':'gauche')+') sur ta planche de départ, épaules face à ta cible. Balle tenue devant toi à hauteur de poitrine, l’autre main sous la balle pour la soutenir, poignet relâché.</li>'
+    +'<li><b>Départ</b>Pied de glisse ('+(R?'droit':'gauche')+') sur ta latte de départ, épaules face à ta cible. Balle tenue devant toi à hauteur de poitrine, l’autre main sous la balle pour la soutenir, poignet relâché.</li>'
     +'<li><b>Pas 1 : la poussée</b>Premier pas du pied '+(R?'gauche':'droit')+' (côté de ta main) et la balle part vers l’avant en même temps, sans l’abaisser trop vite.</li>'
     +'<li><b>Pas 2 et 3 : le balancier</b>La balle descend puis monte derrière toi. Reste droit, épaules parallèles à ta ligne, ne tire pas la balle.</li>'
     +'<li><b>Pas 4 : la glissade</b>Glisse sur le pied '+(R?'droit':'gauche')+', genou fléchi. La balle passe en bas du balancier juste à ce moment : tu la lâches au niveau de la cheville.</li>'
     +'<li><b>Fin de geste</b>Garde la pose 3 secondes : équilibre, bras qui monte vers la cible, épaules face à ta ligne. Si tu tombes sur le côté, ton lancer n’était pas dans l’axe.</li>'
-    +'</ol><div class="small mute" style="margin-top:6px">Débutant : approche à 4 pas. Les points d’approche te servent à repérer la même planche à chaque fois, avant et après la glissade.</div></div>';
+    +'</ol><div class="small mute" style="margin-top:6px">Débutant : approche à 4 pas. Les points d’approche te servent à repérer la même latte à chaque fois, avant et après la glissade.</div></div>';
   if(state.settings.two)h+='<div class="card"><h2>Deux mains : l’essentiel</h2><ol class="stepl">'
     +'<li><b>Prise</b>Deux trous pour les doigts, pas de pouce. La main '+(R?'gauche':'droite')+' lance ; l’autre main soutient la balle sur le côté jusqu’au bas du balancier.</li>'
     +'<li><b>Départ</b>Balle près de la hanche ou du torse, les deux mains dessus. Beaucoup de joueurs à deux mains font 3 ou 4 pas, en glissant sur le pied '+(R?'droit':'gauche')+'.</li>'
     +'<li><b>Lâcher</b>La main de guide quitte la balle juste avant le lâcher, la main qui lance remonte sous et derrière la balle. Retire bien la main de guide de la trajectoire : c’est le point de sécurité.</li>'
     +'<li><b>Finish</b>Épaules et hanches s’ouvrent vers la cible, équilibre tenu 3 secondes. Garde tes yeux sur ta flèche.</li>'
-    +'</ol><div class="small mute" style="margin-top:6px">Ta géométrie de piste (planches, poche, spares) ne change pas. C’est la technique qui diffère. Fais valider ta prise et ton lâcher par un entraîneur ou une personne de ton club.</div></div>';
+    +'</ol><div class="small mute" style="margin-top:6px">Ta géométrie de piste (lattes, poche, spares) ne change pas. C’est la technique qui diffère. Fais valider ta prise et ton lâcher par un entraîneur ou une personne de ton club.</div></div>';
   h+='<div class="card"><h2>Les trois habitudes qui comptent</h2><ol class="stepl">'
-    +'<li><b>Même départ, même cible</b>Note ta planche de départ et ta planche de glisse. Si elles ne sont pas les mêmes, ta ligne a changé.</li>'
-    +'<li><b>Regarde la cible, pas les quilles</b>Une flèche ou une planche entre deux flèches. Garde les yeux dessus 2 secondes avant de partir.</li>'
+    +'<li><b>Même départ, même cible</b>Note ta latte de départ et ta latte de glisse. Si elles ne sont pas les mêmes, ta ligne a changé.</li>'
+    +'<li><b>Regarde la cible, pas les quilles</b>Une flèche ou une latte entre deux flèches. Garde les yeux dessus 2 secondes avant de partir.</li>'
     +'<li><b>Même routine à chaque boule</b>Respiration, visée, départ. C’est ce qui rend les spares plus réguliers.</li>'
     +'</ol></div>';
   return h;
@@ -1771,7 +1948,7 @@ function lnSpares(){
   let h='<div class="card"><h2>Repères de spare</h2><div class="small mute" style="margin-bottom:6px">Touche la ou les quilles qui restent debout.</div>'+lnDeck(pins)
     +(noStrike(pins)?'<div class="small mute" style="margin-top:10px">Pour ce reste (quille 10, 9 ou 6) : boule plastique, droit sur la quille.</div>':'<div class="row2" style="margin-top:10px"><button class="btn'+(sy==='b'?' primary':'')+'" data-act="ln-sys" data-s="b">Boule de strike (3-6-9)</button><button class="btn'+(sy==='a'?' primary':'')+'" data-act="ln-sys" data-s="a">Boule plastique (droite)</button></div>');
   if(!pins.length){
-    h+='<div class="small mute" style="margin-top:10px">'+(sy==='b'?'Le système <b>3-6-9</b> garde la cible de ton strike et déplace seulement tes pieds : 3, 6 ou 9 planches du côté opposé à la quille. Il part de ta ligne de strike (voir l’onglet Huile).':'Avec une <b>boule plastique</b> sans effet, tu lances droit vers la quille : seule la position de départ change selon la quille. Les quilles de coin (7 et 10) passent automatiquement en boule plastique.')+'</div></div>';
+    h+='<div class="small mute" style="margin-top:10px">'+(sy==='b'?'Le système <b>3-6-9</b> garde la cible de ton strike et déplace seulement tes pieds : 3, 6 ou 9 lattes du côté opposé à la quille. Il part de ta ligne de strike (voir l’onglet Huile).':'Avec une <b>boule plastique</b> sans effet, tu lances droit vers la quille : seule la position de départ change selon la quille. Les quilles de coin (7 et 10) passent automatiquement en boule plastique.')+'</div></div>';
     return h+spTrack();
   }
   return h+spareBody(pins)+spTrack();
@@ -1821,7 +1998,7 @@ function spareBody(pins){
     const endB=s+(t-s)*pf/15;bad=endB<1.5||endB>38.5;
     lines=[{pts:[[s,0],[Math.max(1,Math.min(39,endB)),pf]]}];
     marks=[{b:s,ft:0,t:'départ '+s,dx:-9,dy:16},{b:t,ft:15,t:'cible '+t,c:'var(--warn)',dx:-7}];
-    txt='<div class="kv"><b>Départ</b><span>planche '+s+'</span><b>Cible</b><span>planche '+t+(arrowName(t)?' · près de la '+arrowName(t):'')+'</span></div><div class="small mute" style="margin-top:8px">Lance droit, sans effet. Place tes épaules face à la quille et garde ton pied de départ sur la même planche en finissant.'+(pins.length>1&&!isSpl?' Plusieurs quilles : repère moyen entre les quilles.':'')+(custom?' Le tracé est la ligne droite qui passe par ta cible.':'')+'</div>';
+    txt='<div class="kv"><b>Départ</b><span>latte '+s+'</span><b>Cible</b><span>latte '+t+(arrowName(t)?' · près de la '+arrowName(t):'')+'</span></div><div class="small mute" style="margin-top:8px">Lance droit, sans effet. Place tes épaules face à la quille et garde ton pied de départ sur la même latte en finissant.'+(pins.length>1&&!isSpl?' Plusieurs quilles : repère moyen entre les quilles.':'')+(custom?' Le tracé est la ligne droite qui passe par ta cible.':'')+'</div>';
     if(bad)note='<div class="ins warn" style="margin-top:8px"><span class="small"><b>Ligne hors piste.</b> Avec ce départ et cette cible, la ligne droite sortirait de la piste avant les quilles. Vérifie tes valeurs dans « Ajuster ».</span></div>';
   }else{
     const sl=G?(s<L.S):(s>L.S);
@@ -1830,7 +2007,7 @@ function spareBody(pins){
     bad=Math.min(...tr.map(q=>q[0]))<2||Math.max(...tr.map(q=>q[0]))>38;
     lines=[{pts:[[L.S,0],[L.T,15]],cls:'ghost'},bad?{pts:[[s,0],[t,15]]}:{pts:tr,smooth:true}];
     marks=[{b:L.S,ft:0,t:'strike '+L.S,c:'var(--mute)',dx:(sl?9:-9),dy:16},{b:s,ft:0,t:'spare '+s,dx:(sl?-9:9),dy:16},{b:t,ft:15,t:'cible '+t,c:'var(--warn)',dx:(t<20?-7:7)}];
-    txt='<div class="kv"><b>Déplace-toi</b><span>'+boardsWord(s-L.S)+'</span><b>Départ</b><span>planche '+s+' (strike : '+L.S+')</span><b>Cible</b><span>planche '+t+(arrowName(t)?' · '+arrowName(t):'')+(t===L.T?' (comme au strike)':'')+'</span></div><div class="small mute" style="margin-top:8px">Le tracé après la cible est une estimation de la courbe de ta boule. Tu peux régler ta ligne de strike dans l’onglet Huile.'+(pins.length>1&&!isSpl?' Plusieurs quilles : repère moyen.':'')+'</div>';
+    txt='<div class="kv"><b>Déplace-toi</b><span>'+boardsWord(s-L.S)+'</span><b>Départ</b><span>latte '+s+' (strike : '+L.S+')</span><b>Cible</b><span>latte '+t+(arrowName(t)?' · '+arrowName(t):'')+(t===L.T?' (comme au strike)':'')+'</span></div><div class="small mute" style="margin-top:8px">Le tracé après la cible est une estimation de la courbe de ta boule. Tu peux régler ta ligne de strike dans l’onglet Huile.'+(pins.length>1&&!isSpl?' Plusieurs quilles : repère moyen.':'')+'</div>';
     if(bad)note='<div class="ins warn" style="margin-top:8px"><span class="small"><b>Pas réaliste avec une boule de strike.</b> Pour cette quille, ces repères feraient sortir la boule de la piste. Prends plutôt une boule plastique, ou revois tes valeurs dans « Ajuster ».</span><button class="btn primary block" data-act="ln-sys" data-s="a" style="margin-top:8px">Voir avec la boule plastique</button></div>';
   }
   /* ajustement */
@@ -1840,7 +2017,7 @@ function spareBody(pins){
       const p=eff[0],v=vals[0],lft=G?-1:1;
       const stp=(f,lab,val)=>'<div class="stp"><span class="small mute">'+lab+'</span><button data-act="ln-ps" data-p="'+p+'" data-f="'+f+'" data-d="'+lft+'">◀</button><b>'+val+'</b><button data-act="ln-ps" data-p="'+p+'" data-f="'+f+'" data-d="'+(-lft)+'">▶</button></div>';
       ed+='<div class="ins good" style="margin-top:8px"><strong>Quille '+p+' · '+(sy==='a'?'boule plastique':'boule de strike')+(v.custom?' · personnalisé':'')+'</strong>'+stp('s','Départ',v.s)+stp('t','Cible',v.t)
-        +'<div class="small mute">Repère d’origine : départ '+v.d.s+', cible '+v.d.t+'. ◀ ▶ déplacent vers la gauche ou la droite de la piste, d’une planche.</div>'
+        +'<div class="small mute">Repère d’origine : départ '+v.d.s+', cible '+v.d.t+'. ◀ ▶ déplacent vers la gauche ou la droite de la piste, d’une latte.</div>'
         +(v.custom?'<button class="btn block" data-act="ln-pr" data-p="'+p+'" style="margin-top:8px">Revenir au repère d’origine</button>':'')+'</div>';
     }else ed+='<div class="small mute" style="margin-top:8px">Ajuste une quille à la fois : choisis une seule quille sur le clavier.</div>';
   }
@@ -1873,7 +2050,7 @@ function lnOil(){
     +laneSVG({alt:'Ligne de strike',oil:L.len,pocket:true,hi:[1,G?2:3],anim:true,
       lines:[{pts:strikePath(L,ex)}],
       marks:[{b:L.S,ft:0,t:'départ '+L.S,dx:9,dy:16},{b:L.T,ft:15,t:'cible '+L.T,c:'var(--warn)',dx:(L.T<20?7:-7)},{b:ex,ft:L.len,t:'sortie '+ex,c:'#3a8fd8',dx:7}]})
-    +'<div class="kv" style="margin-top:10px"><b>Sortie d’huile</b><span>planche '+ex+' à '+L.len+' ft (longueur − 31)</span><b>Cible</b><span>planche '+L.T+(arrowName(L.T)?' · '+arrowName(L.T):'')+'</span><b>Départ</b><span>planche '+L.S+' (pied de glisse)</span></div>'
+    +'<div class="kv" style="margin-top:10px"><b>Sortie d’huile</b><span>latte '+ex+' à '+L.len+' ft (longueur − 31)</span><b>Cible</b><span>latte '+L.T+(arrowName(L.T)?' · '+arrowName(L.T):'')+'</span><b>Départ</b><span>latte '+L.S+' (pied de glisse)</span></div>'
     +(L.len>46?'<div class="ins warn" style="margin-top:8px"><span class="small">Au-delà d’environ 47 ft, la règle des 31 devient peu fiable : la ligne se rapproche du milieu et demande surtout de la précision.</span></div>':'')
     +'<div class="small mute" style="margin-top:8px">Le schéma est indicatif. Il donne un point de départ pour tes premières boules, pas une vérité : ajuste ensuite selon ce que la boule fait.</div>';
   h+='<div style="height:10px"></div><div class="sumh">Ma ligne</div><div class="stp"><span class="small mute">Départ</span><button data-act="ln-s" data-d="'+(G?-1:1)+'">◀</button><b>'+L.S+'</b><button data-act="ln-s" data-d="'+(G?1:-1)+'">▶</button></div>'
@@ -1885,17 +2062,17 @@ function lnOil(){
   if(ui.ln.adj){
     const out=ui.ln.adj==='out',S2=L.S+(out?-2:2),T2=L.T+(out?-1:1);
     const leaves=out?(G?'7, 4-7':'10, 6-10'):(G?'6, 10, 3-6-10':'4, 7, 2-4-7');
-    h+='<div class="ins good" style="margin-top:10px"><strong>Règle du 2 pour 1</strong><span class="small">'+(out?'Ta boule arrive à l’extérieur de la poche (restes fréquents : '+leaves+').':'Ta boule arrive à l’intérieur de la poche (restes fréquents : '+leaves+').')+' Déplace tes pieds de 2 planches et ta cible de 1 planche du même côté : <b>départ '+S2+'</b>, <b>cible '+T2+'</b>.</span><button class="btn primary block" data-act="ln-apply" data-s="'+S2+'" data-t="'+T2+'" style="margin-top:8px">Appliquer à ma ligne</button></div>';
+    h+='<div class="ins good" style="margin-top:10px"><strong>Règle du 2 pour 1</strong><span class="small">'+(out?'Ta boule arrive à l’extérieur de la poche (restes fréquents : '+leaves+').':'Ta boule arrive à l’intérieur de la poche (restes fréquents : '+leaves+').')+' Déplace tes pieds de 2 lattes et ta cible de 1 latte du même côté : <b>départ '+S2+'</b>, <b>cible '+T2+'</b>.</span><button class="btn primary block" data-act="ln-apply" data-s="'+S2+'" data-t="'+T2+'" style="margin-top:8px">Appliquer à ma ligne</button></div>';
   }
   h+='<div class="small mute" style="margin-top:10px">Bouger les pieds de 2 et la cible de 1 garde à peu près la même zone de sortie de l’huile. Si tu ne bouges que les pieds, tu changes ton angle. Tu peux aussi jouer sur la vitesse ou changer de boule.</div></div>';
-  h+='<div class="card"><h2>Tu ne connais pas l’huile ?</h2><ol class="stepl"><li><b>Demande</b>La longueur de l’huile (en ft ou en mètres) et si c’est une piste « house » ou un schéma sport.</li><li><b>Pars de la ligne standard</b>40 ft : départ 20, cible planche 10 (2e flèche).</li><li><b>Observe 2 ou 3 boules</b>Où elle arrive ? Applique la règle du 2 pour 1 ci-dessus.</li></ol><div class="small mute" style="margin-top:6px">Une piste « house » pardonne plus les écarts vers l’extérieur ; un schéma sport punit les mêmes erreurs. Ça reste un point de départ.</div></div>';
+  h+='<div class="card"><h2>Tu ne connais pas l’huile ?</h2><ol class="stepl"><li><b>Demande</b>La longueur de l’huile (en ft ou en mètres) et si c’est une piste « house » ou un schéma sport.</li><li><b>Pars de la ligne standard</b>40 ft : départ 20, cible latte 10 (2e flèche).</li><li><b>Observe 2 ou 3 boules</b>Où elle arrive ? Applique la règle du 2 pour 1 ci-dessus.</li></ol><div class="small mute" style="margin-top:6px">Une piste « house » pardonne plus les écarts vers l’extérieur ; un schéma sport punit les mêmes erreurs. Ça reste un point de départ.</div></div>';
   return h;
 }
 const DRILLS=[
  {id:'d1',t:'Les coins : 10 et 7',max:10,goal:8,how:'10 lancers : 5 sur la 10, 5 sur la 7, une seule quille à chaque fois. Utilise ton système (onglet Spares). Rejoue la même quille quand tu la rates.'},
  {id:'d2',t:'Tour des quilles',max:10,goal:8,how:'Une quille seule à chaque lancer, dans l’ordre 7, 4, 2, 3, 6, 10, 7, 4, 3, 10. Applique le repère de départ, puis note le nombre de réussites.'},
  {id:'d3',t:'Même ligne ×10',max:10,goal:6,how:'10 boules de strike avec le même départ, la même cible et la même vitesse. Compte celles qui arrivent dans la poche.'},
- {id:'d4',t:'2 pour 1 à blanc',max:6,goal:4,how:'3 boules sur ta ligne, puis 3 boules après avoir bougé les pieds de 2 planches et la cible de 1, du côté de ton miss. Compte les boules dans la poche.'},
+ {id:'d4',t:'2 pour 1 à blanc',max:6,goal:4,how:'3 boules sur ta ligne, puis 3 boules après avoir bougé les pieds de 2 lattes et la cible de 1, du côté de ton miss. Compte les boules dans la poche.'},
  {id:'d5',t:'Routine de pré-lancer',max:10,goal:8,how:'10 lancers avec exactement la même routine : respiration, regard 2 s sur la cible, départ. Note combien tu as tenus sans en sauter une étape.'},
  {id:'d6',t:'Spares à plusieurs quilles',max:5,goal:3,how:'Place-toi 5 restes (4-7, 6-10, 2-4-5, 3-6-10, 2-8). Calcule le repère moyen avec l’onglet Spares, puis tire.'}
 ];
@@ -2020,12 +2197,37 @@ function render(){
   }catch(e){showErr(e);}
 }
 const VIDEO=false; /* analyse vidéo masquée pour l'instant : passer à true pour la réactiver */
-function goTab(t){if(t==='throw'&&!VIDEO)t='home';ui.tab=t;ui.abandon=false;ui.delId=null;ui.gv=null;render();try{window.scrollTo(0,0);}catch(e){}}
+function goTab(t){if(t==='throw'&&!VIDEO)t='home';ui.fe=null;ui.tab=t;ui.abandon=false;ui.delId=null;ui.gv=null;render();try{window.scrollTo(0,0);}catch(e){}}
 document.addEventListener('click',e=>{
   const tb=e.target.closest('nav button');
   if(tb){goTab(tb.dataset.tab);return;}
   const b=e.target.closest('[data-act]');if(!b)return;
   const act=b.dataset.act,c=state.current;
+  if(act==='fedit'){
+    feOpen(b.dataset.k,+b.dataset.f);render();
+    setTimeout(()=>{const el=document.querySelector('.card[style*="var(--warn)"]');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},30);
+    return;
+  }else if(act==='fe-roll'){
+    const fe=ui.fe;fe.rolls.push(+b.dataset.v);const I=feInfo();
+    if(!I.done&&I.ns.standing<10&&I.ns.standing>0){fe.pend=fe.rolls.length-1;const j=fe.pend;fe.sel=(fe.old[j]===fe.rolls[j]&&fe.oldL[j]&&fe.oldL[j].length===I.ns.standing)?fe.oldL[j].slice():[];}
+    render();return;
+  }else if(act==='fe-pin'){
+    const fe=ui.fe,p=+b.dataset.p,i=fe.sel.indexOf(p);if(i>=0)fe.sel.splice(i,1);else fe.sel.push(p);render();return;
+  }else if(act==='fe-leave'){
+    const fe=ui.fe;fe.l[fe.pend]=fe.sel.slice().sort((a,b)=>a-b);fe.pend=null;fe.sel=[];render();return;
+  }else if(act==='fe-skip'){
+    const fe=ui.fe;fe.l[fe.pend]=null;fe.pend=null;fe.sel=[];render();return;
+  }else if(act==='fe-back'){
+    const fe=ui.fe;delete fe.l[fe.rolls.length-1];fe.rolls.pop();fe.pend=null;fe.sel=[];render();return;
+  }else if(act==='fe-ok'){
+    feApply();return;
+  }else if(act==='fe-cancel'){
+    ui.fe=null;render();return;
+  }else if(act==='gm-mode'){
+    const g=state.games.find(x=>x.id===ui.gv);
+    if(g){const m=b.dataset.m;if(g.m!==m){g.e=new Date().toISOString();g.m=m;g.ev=m==='E'?'':(g.ev||evName(m).trim());persist();toast('Type : '+MODES[m]);}}
+    render();return;
+  }
   if(act==='roll'){
     const v=+b.dataset.v;ui.pend=null;ui.abandon=false;
     c.r.push(v);
@@ -2063,14 +2265,14 @@ document.addEventListener('click',e=>{
   }else if(act==='save'){
     const s=score(c.r).total;
     const mo=state.settings.mode||'E';
-    const cx=ctxOf(),ctx={};['c','b','o','q'].forEach(k=>{if(cx[k])ctx[k]=cx[k];});
+    const cx=ctxOf(),ctx={};['c','b','w','o','q'].forEach(k=>{if(cx[k])ctx[k]=cx[k];});
     const gm={id:Date.now().toString(36),d:new Date().toISOString(),m:mo,ev:mo==='E'?'':evName(mo).trim(),r:c.r.slice(),l:Object.assign({},c.l),s};
     if(Object.keys(ctx).length)gm.ctx=ctx;
     if(c.bs&&c.bs.length)gm.bs=c.bs.map(x=>({i:x.i,b:x.b}));
     state.games.push(gm);
     state.current={r:[],l:{}};ui.pend=null;ui.sel=[];persist();render();toast('Partie enregistrée : '+s);
   }else if(act==='del'){
-    if(ui.delId===b.dataset.id){state.games=state.games.filter(g=>g.id!==b.dataset.id);ui.delId=null;persist();}else ui.delId=b.dataset.id;
+    if(ui.delId===b.dataset.id){ghTomb(b.dataset.id);state.games=state.games.filter(g=>g.id!==b.dataset.id);ui.delId=null;persist();}else ui.delId=b.dataset.id;
     render();
   }else if(act==='export'){
     try{navigator.clipboard.writeText(JSON.stringify(state)).then(()=>toast('Données copiées'),()=>toast('Copie impossible ici'));}catch(err){toast('Copie impossible ici');}
@@ -2139,19 +2341,28 @@ document.addEventListener('click',e=>{
   }else if(act==='fm'){
     ui.fm=b.dataset.m;ui.hAll=false;render();
   }else if(act==='gview'){
-    ui.gv=b.dataset.id;ui.delId=null;render();window.scrollTo(0,0);
+    ui.fe=null;ui.gv=b.dataset.id;ui.delId=null;render();window.scrollTo(0,0);
   }else if(act==='gback'){
-    ui.gv=null;ui.delId=null;render();
+    ui.fe=null;ui.gv=null;ui.delId=null;render();
   }else if(act==='gnav'){
     const arr=src(),k=arr.findIndex(g=>g.id===ui.gv)+(+b.dataset.n);
-    if(arr[k]){ui.gv=arr[k].id;ui.delId=null;render();window.scrollTo(0,0);}
+    if(arr[k]){ui.fe=null;ui.gv=arr[k].id;ui.delId=null;render();window.scrollTo(0,0);}
   }else if(act==='gdel'){
-    if(ui.delId===b.dataset.id){state.games=state.games.filter(g=>g.id!==b.dataset.id);ui.gv=null;ui.delId=null;persist();toast('Partie supprimée');}else ui.delId=b.dataset.id;
+    if(ui.delId===b.dataset.id){ghTomb(b.dataset.id);state.games=state.games.filter(g=>g.id!==b.dataset.id);ui.gv=null;ui.delId=null;persist();toast('Partie supprimée');}else ui.delId=b.dataset.id;
     render();
   }else if(act==='hall'){
     ui.hAll=true;render();
   }else if(act==='prof'){
     if(ui.demo){ui.dw=b.dataset.id==='dw-d'?'d':'m';ui.gv=null;ui.aiText='';ui.aiThrow='';render();}else switchProfile(b.dataset.id);
+  }else if(act==='gh-save'){
+    const r=($('#ghrepo')&&$('#ghrepo').value||'').trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,'').replace(/\/$/,''),t=($('#ghtok')&&$('#ghtok').value||'').trim();
+    if(!/^[\w.-]+\/[\w.-]+$/.test(r)){toast('Dépôt : écris pseudo/nom-du-dépôt');return;}
+    if(t.length<20){toast('Colle la clé d’accès complète');return;}
+    ghSet({repo:r,tok:t});ghSync(true);
+  }else if(act==='gh-now'){
+    ghSync(true);
+  }else if(act==='gh-off'){
+    if(ui.ghOff){ghSet(null);ui.ghOff=false;GH.st='';render();toast('Synchronisation désactivée sur ce téléphone');}else{ui.ghOff=true;render();}
   }else if(act==='bk-copy'){
     bkCopy();
   }else if(act==='bk-restore'){
@@ -2220,7 +2431,11 @@ document.addEventListener('focusin',e=>{
 });
 document.addEventListener('change',e=>{
   const el=e.target;
-  if(el.id==='ballfile'){if(el.files&&el.files[0]){identifyBall(el.files[0]);el.value='';}}
+  if(el.id==='ctxw'){ctxOf().w=el.value?+el.value:'';persist();render();}
+  else if(el.id==='gctxw'){const g=state.games.find(x=>x.id===ui.gv);if(g){g.e=new Date().toISOString();g.ctx=g.ctx||{};if(el.value)g.ctx.w=+el.value;else delete g.ctx.w;persist();render();toast('Partie modifiée');}}
+  else if(el.id==='gctxc'){const g=state.games.find(x=>x.id===ui.gv);if(g){g.e=new Date().toISOString();const v=el.value.trim().slice(0,60);g.ctx=g.ctx||{};if(v)g.ctx.c=v;else delete g.ctx.c;persist();render();toast('Partie modifiée');}}
+  else if(el.id==='gev'){const g=state.games.find(x=>x.id===ui.gv);if(g){g.e=new Date().toISOString();g.ev=el.value.trim().slice(0,30);persist();render();toast('Partie modifiée');}}
+  else if(el.id==='ballfile'){if(el.files&&el.files[0]){identifyBall(el.files[0]);el.value='';}}
   else if(el.id==='vfile'){if(el.files&&el.files[0]){loadVideo(el.files[0]);el.value='';}}
   else if(el.id==='fps'){ui.t.fps=+el.value;render();}
   else if(el.id==='slow'){ui.t.slow=+el.value;render();}
@@ -2233,7 +2448,7 @@ document.addEventListener('change',e=>{
 
 window.addEventListener('error',ev=>{try{const el=$('#err');el.style.display='block';el.textContent='Erreur : '+(ev.message||'inconnue');}catch(x){}});
 document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>goTab(b.dataset.tab)));
-loadLocal();ensureProfiles();render();
+loadLocal();ensureProfiles();render();ghInit();
 getSample().then(()=>{if(ui.tab==='coach')render();});
 (async()=>{
   try{
