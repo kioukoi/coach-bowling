@@ -1142,6 +1142,8 @@ function ghCard(){
   let h='<div class="card"><h2>Synchronisation GitHub</h2>';
   if(c){
     h+='<div class="small mute" style="margin-bottom:6px">Les parties de tous les joueurs sont enregistrées dans le dépôt privé <b>'+esc(c.repo)+'</b> et partagées entre les téléphones connectés.</div><div id="ghstat">'+ghStat()+'</div>'
+      +'<button class="btn block" data-act="gh-share" style="margin-top:8px">🔑 Copier la clé pour un autre appareil</button>'
+      +(ui.ghShow?'<textarea readonly rows="2" id="ghshare" style="width:100%;margin-top:6px;font:12px monospace;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--card);color:var(--ink)">'+esc(c.tok)+'</textarea><div class="small mute">Envoie-la-toi (mail, note), puis colle-la sur l’autre appareil. Ne la partage qu’avec ton père.</div>':'')
       +'<div class="row2" style="margin-top:8px"><button class="btn primary" data-act="gh-now">Synchroniser</button><button class="btn" data-act="gh-off">'+(ui.ghOff?'Confirmer':'Déconnecter')+'</button></div>';
   }else{
     h+='<div class="small mute" style="margin-bottom:8px">Enregistre les parties dans un dépôt GitHub privé : rien n’est perdu si tu changes de téléphone, et les parties de chaque joueur se retrouvent sur tous les téléphones connectés.</div>'
@@ -1348,6 +1350,7 @@ function viewHome(){
   const a=allSrc(),A=analyze(a),name=ui.demo?demoName('m'):activeName(),hr=new Date().getHours(),greet=(hr>=5&&hr<18)?'Bonjour':'Bonsoir';
   const pins='<svg class="pinsbg" width="130" height="130" viewBox="0 0 120 120" aria-hidden="true">'+[[60,100],[44,76],[76,76],[28,52],[60,52],[92,52],[12,28],[44,28],[76,28],[108,28]].map(p=>'<circle cx="'+p[0]+'" cy="'+p[1]+'" r="9" fill="#fff"/>').join('')+'</svg>';
   let h=demoBar();
+  if(!ui.demo&&!ghCfg())h+='<div class="card" style="border-color:var(--warn)"><b>Cet appareil n’est pas synchronisé</b><div class="small mute" style="margin:4px 0 10px">Connecte-le à ton dépôt GitHub pour retrouver tes parties et tes stats sur tous tes appareils.</div><button class="btn primary block" data-act="gh-open">Connecter cet appareil</button></div>';
   if(!A.n){
     h+='<div class="hero">'+pins+'<small>'+greet+', '+esc(name)+'</small><div class="hl">Prêt pour ta première partie ?</div><p class="hp">Note tes scores frame par frame : ton coach repère tes points faibles et t’aide à progresser.</p><button class="btn hbtn" data-act="go" data-tab="game">Lancer une partie</button></div>';
   }else{
@@ -2360,6 +2363,13 @@ document.addEventListener('click',e=>{
     if(!/^[\w.-]+\/[\w.-]+$/.test(r)){toast('Dépôt : écris pseudo/nom-du-dépôt');return;}
     if(t.length<20){toast('Colle la clé d’accès complète');return;}
     ghSet({repo:r,tok:t});ghSync(true);
+  }else if(act==='gh-open'){
+    ui.pm=true;render();setTimeout(()=>{const el=$('#ghtok')||$('#ghstat');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});if(el.id==='ghtok')el.focus();}},40);
+  }else if(act==='gh-share'){
+    const c=ghCfg();if(!c)return;ui.ghShow=true;render();
+    (async()=>{let ok=false;try{await navigator.clipboard.writeText(c.tok);ok=true;}catch(e){}
+    if(!ok){try{const t=$('#ghshare');t.focus();t.select();ok=document.execCommand('copy');}catch(e){}}
+    toast(ok?'Clé copiée ✓':'Touche la clé puis Copier');})();
   }else if(act==='gh-now'){
     ghSync(true);
   }else if(act==='gh-off'){
