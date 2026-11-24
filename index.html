@@ -146,7 +146,7 @@ select,input[type=number]{border:1px solid var(--line);border-radius:10px;backgr
 .pills{display:flex;gap:8px;margin-bottom:8px}
 .pills .chip{flex:1;padding:10px 4px;text-align:center}
 .errbar{background:#b3261e;color:#fff;font:13px system-ui,sans-serif;padding:8px 14px;display:none}
-.toast{position:fixed;left:50%;bottom:calc(var(--navh,66px) + 90px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
+.toast{z-index:300;position:fixed;left:50%;bottom:calc(var(--navh,66px) + 90px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
 .toast.show{opacity:1}
 .lnav{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px}
 .lnav button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 13px;font:600 13px system-ui,sans-serif;cursor:pointer}
@@ -1641,10 +1641,12 @@ function liveStats(r){
   fi.forEach((ids,f)=>{if(!ids.length)return;const comp=f<9?(ids.length===2||r[ids[0]]===10):ns.done;if(comp&&!frameClosed(r,ids))o++;});
   return{x,s,o};
 }
+function maxPossible(r){const q=r.slice();let n=0;while(!nextState(q).done&&n++<30)q.push(nextState(q).standing);return score(q).total;}
 function rollFeedback(r){
   const S=standingBefore(r);let n=0;
   for(let i=r.length-1;i>=0&&r[i]===10&&S[i]===10;i--)n++;
-  if(n===2)toast('Double !',1100);else if(n===3)toast('Dinde ! 🦃',1300);else if(n>3)toast(n+' strikes d’affilée !',1300);
+  const m=n===2?'Double !':n===3?'Dinde ! 🦃':n>3?n+' strikes d’affilée !':'';
+  if(m){ui.fb=m;clearTimeout(rollFeedback.t);rollFeedback.t=setTimeout(()=>{ui.fb='';if(ui.tab==='game')render();},3000);render();}
 }
 function sessionStrip(){
   const m=state.settings.mode||'E',x=ctxOf(),ev=evName(m).trim(),b=curBall();
@@ -1668,7 +1670,9 @@ function viewGame(){
   h+=boardHTML(r,ns.done?-1:ns.frame,c.l,'cur');
   const cf=sc.cum.filter(v=>v!==null).length,ls=r.length>=3?liveStats(r):null,pace=(!ns.done&&cf>=3)?Math.round(sc.total/cf*10):null,pl=(n,w)=>n+' '+w+(n>1?'s':'');
   h+='<div class="total"><div><span class="mute">'+(ns.done?'Partie terminée':'Frame '+(ns.frame+1)+' · boule '+(ns.ball+1)+(ns.standing<10?' · '+ns.standing+' debout':''))+'</span>'
-    +(ls?'<div class="small mute">'+pl(ls.x,'strike')+' · '+pl(ls.s,'spare')+' · '+pl(ls.o,'ouverte')+(pace?' · rythme ≈ '+pace:'')+'</div>':'')+'</div><b>'+sc.total+'</b></div>';
+    +(ui.fb?'<div style="font-weight:800;color:var(--good)">'+esc(ui.fb)+'</div>':'')
+    +(ls?'<div class="small mute">'+pl(ls.x,'strike')+' · '+pl(ls.s,'spare')+' · '+pl(ls.o,'ouverte')+(pace?' · rythme ≈ '+pace:'')+'</div>':'')
+    +(!ns.done&&r.length?'<div class="small">Max possible : <b>'+maxPossible(r)+'</b> <span class="mute">(−'+(300-maxPossible(r))+')</span></div>':'')+'</div><b>'+sc.total+'</b></div>';
 
   if(ui.fe&&ui.fe.k==='cur')return h+feCard();
   if(r.length&&(ns.done||ns.frame>0)&&state.games.length<3)h+='<div class="small mute" style="margin:6px 2px 0">Une erreur ? Touche la frame à corriger.</div>';
@@ -2355,7 +2359,7 @@ document.addEventListener('click',e=>{
     render();return;
   }
   if(act==='roll'){
-    const v=+b.dataset.v;ui.pend=null;ui.abandon=false;ui.recap=null;
+    const v=+b.dataset.v;ui.pend=null;ui.abandon=false;ui.recap=null;ui.fb='';
     c.r.push(v);c.t=Date.now();
     const ns=nextState(c.r);
     if(!ns.done&&ns.standing<10){ui.pend=c.r.length-1;ui.sel=[];}
@@ -2371,7 +2375,7 @@ document.addEventListener('click',e=>{
       c.r.push(stand.length-sel.length);c.t=Date.now();
       const n2=nextState(c.r);
       if(!n2.done&&n2.standing<10&&sel.length)c.l[c.r.length-1]=sel.slice().sort((a,b)=>a-b);
-      ui.sel=[];ui.pend=null;ui.abandon=false;ui.recap=null;persist(true);render();rollFeedback(c.r);
+      ui.sel=[];ui.pend=null;ui.abandon=false;ui.recap=null;ui.fb='';persist(true);render();rollFeedback(c.r);
     }
   }else if(act==='padmode'){
     ui.pad=!ui.pad;ui.sel=[];ui.pend=null;render();
