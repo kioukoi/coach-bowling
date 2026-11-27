@@ -17,7 +17,8 @@ html,body{margin:0;overscroll-behavior-y:none}
 button,.pin,.dpin{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .pin,.dpin{touch-action:none}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;padding-bottom:calc(var(--navh,66px) + 18px)}
-header{padding:10px 16px 2px;display:flex;align-items:baseline;justify-content:space-between}
+header{padding:8px 16px 0;display:flex;align-items:baseline;justify-content:flex-end;min-height:0}
+header h1{margin-right:auto}
 header h1{font-size:20px;margin:0;letter-spacing:-.2px}
 header span{color:var(--mute);font-size:13px}
 main{padding:8px 14px 16px;max-width:560px;margin:0 auto}
@@ -51,7 +52,7 @@ nav button.on{color:var(--accent)}
 .btn.block{width:100%}
 .btn:disabled{opacity:.4}
 .link{background:none;border:0;color:var(--mute);font:14px system-ui,sans-serif;text-decoration:underline;padding:8px;cursor:pointer}
-.pins{display:flex;flex-direction:column;align-items:center;gap:8px;margin:10px 0}
+.pins{display:flex;flex-direction:column;align-items:center;gap:5px;margin:8px 0}
 .pins div{display:flex;gap:14px}
 .pin{width:46px;height:46px;border-radius:50%;border:2px solid var(--line);background:var(--card);color:var(--ink);font:700 14px system-ui,sans-serif;cursor:pointer}
 .pin.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -74,15 +75,10 @@ nav button.on{color:var(--accent)}
 .dpin{width:46px;height:46px;border-radius:50%;border:2px solid var(--line);background:var(--card);color:var(--ink);font:700 15px system-ui,sans-serif;cursor:pointer;padding:0}
 .dpin.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .dpin.gone{display:inline-block;border:2px dashed var(--line);opacity:.35;cursor:default}
-.deck{display:flex;flex-direction:column;align-items:center;gap:7px;margin:4px 0 8px}
-.deck div{display:flex;gap:14px}
-/* perspective : rangée du fond (7-8-9-10) plus petite, quille 1 plus grande et plus écartée */
-.deck>div:nth-child(1),.pins>div:nth-child(1){gap:14px}.deck>div:nth-child(2),.pins>div:nth-child(2){gap:20px}.deck>div:nth-child(3),.pins>div:nth-child(3){gap:26px}
-.deck>div:nth-child(1) .dpin,.pins>div:nth-child(1) .pin{width:44px;height:44px}
-.deck>div:nth-child(2) .dpin,.pins>div:nth-child(2) .pin{width:48px;height:48px}
-.deck>div:nth-child(3) .dpin,.pins>div:nth-child(3) .pin{width:52px;height:52px}
-.deck>div:nth-child(4) .dpin,.pins>div:nth-child(4) .pin{width:56px;height:56px}
-@media (max-height:700px){.deck{gap:4px}.deck>div:nth-child(1) .dpin{width:40px;height:40px}.deck>div:nth-child(2) .dpin{width:44px;height:44px}.deck>div:nth-child(3) .dpin{width:48px;height:48px}.deck>div:nth-child(4) .dpin{width:52px;height:52px}}
+.deck{display:flex;flex-direction:column;align-items:center;gap:4px;margin:2px 0 6px}
+.deck div{display:flex;gap:22px}
+.pins div{gap:22px}
+.deck .dpin,.pins .pin{width:44px;height:44px}
 .actrow{display:flex;gap:8px}
 .deckc{position:sticky;bottom:calc(var(--navh,66px) + 6px);z-index:5;box-shadow:0 -8px 16px rgba(0,0,0,.10)}
 .okbtn{flex:1;min-width:0;height:58px;border-radius:16px;border:0;background:var(--accent);color:var(--accent-ink);font:800 20px system-ui,sans-serif;cursor:pointer}
@@ -1054,6 +1050,7 @@ function switchProfile(id){
 function renderWho(){
   const el=$('#who');if(!el)return;
   el.style.display=(ui.tab==='game'&&!ui.demo&&!ui.pm&&state.current.r.length>0)?'none':'';
+  const h1=$('header h1');if(h1)h1.style.display=(ui.tab==='game'&&!ui.demo&&!ui.pm&&state.current.r.length>0)?'none':'';
   if(ui.demo){el.innerHTML='<button class="chip on" data-act="noop">Compte démo</button><button class="chip" data-act="demo-off">Quitter la démo</button>';return;}
   el.innerHTML=state.profiles.map(p=>'<button class="chip'+(p.id===state.active?' on':'')+'" data-act="prof" data-id="'+esc(p.id)+'">'+esc(p.name)+'</button>').join('')
     +'<button class="chip gear" data-act="pgear" aria-label="Gérer les joueurs">⚙</button>';
